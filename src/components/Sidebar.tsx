@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
 
 const navigationItems = [
   { title: "Home", url: "/", icon: Home },
@@ -24,6 +25,7 @@ const navigationItems = [
 export function Sidebar() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const location = useLocation();
+  const { signOut } = useAuth();
 
   const isActive = (path: string) => {
     if (path === "/") return location.pathname === "/";
@@ -103,6 +105,7 @@ export function Sidebar() {
       <div className="p-4 border-t border-border">
         <Button
           variant="ghost"
+          onClick={signOut}
           className={cn(
             "w-full justify-start gap-3",
             isCollapsed && "justify-center"
