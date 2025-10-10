@@ -1,1 +1,4 @@
 project_id = "mpdyvioikfhnopajando"
+
+[functions.generate-explanation]
+verify_jwt = false

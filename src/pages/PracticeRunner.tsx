@@ -10,8 +10,13 @@
   import { Separator } from "@/components/ui/separator";
   import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
   import { MathRenderer } from "@/components/MathRenderer";
-  import { X, Clock, HelpCircle, Eye, EyeOff, Check, AlertCircle } from "lucide-react";
+  import { X, Clock, HelpCircle, Eye, EyeOff, Check, AlertCircle, Sparkles } from "lucide-react";
   import confetti from "canvas-confetti";
+  import { useUserStats } from "@/hooks/useUserStats";
+  import { usePracticeSession } from "@/hooks/usePracticeSession";
+  import { useQuestionAttempt } from "@/hooks/useQuestionAttempt";
+  import { useTopicProgress } from "@/hooks/useTopicProgress";
+  import { toast } from "@/hooks/use-toast";
 
 
   interface VariableConfig {
@@ -283,6 +288,11 @@
     const { topic, model } = useParams();
     const navigate = useNavigate();
 
+    // Hooks
+    const { updateStats } = useUserStats();
+    const { startSession, endSession } = usePracticeSession();
+    const { saveAttempt } = useQuestionAttempt();
+    const { updateProgress } = useTopicProgress(topic || "", model || "");
 
     const [timeLeft, setTimeLeft] = useState(50);
     const [isTimerActive, setIsTimerActive] = useState(true);
@@ -293,6 +303,11 @@
     const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
     const [isDynamic, setIsDynamic] = useState(false);
     const [variables, setVariables] = useState<Record<string, number>>({});
+    const [sessionId, setSessionId] = useState<string | null>(null);
+    const [sessionStartTime, setSessionStartTime] = useState<number>(Date.now());
+    const [questionStartTime, setQuestionStartTime] = useState<number>(Date.now());
+    const [aiExplanation, setAiExplanation] = useState<string>("");
+    const [isLoadingAI, setIsLoadingAI] = useState(false);
 
 
     const question = practiceQuestions[topic as keyof typeof practiceQuestions]?.[model as string];
@@ -308,6 +323,24 @@
       }
     }, [question]);
 
+    // Initialize session on mount
+    useEffect(() => {
+      const initSession = async () => {
+        try {
+          const session = await startSession({ topic: topic || "", model: model || "" });
+          setSessionId(session.id);
+        } catch (error) {
+          console.error("Failed to start session:", error);
+          toast({
+            title: "Error",
+            description: "Failed to start practice session",
+            variant: "destructive",
+          });
+        }
+      };
+      initSession();
+    }, [topic, model, startSession]);
+
 
     const calculateDynamicAnswer = useCallback(
       (modelId: string, vars: Record<string, number>): string => {
@@ -318,13 +351,44 @@
     );
 
 
-    const handleSubmit = useCallback(() => {
+    const handleSubmit = useCallback(async () => {
       const dynamicAnswer = calculateDynamicAnswer(model || "", variables);
       const correct =
         userAnswer.toLowerCase().trim() === dynamicAnswer.toLowerCase().trim();
       setIsCorrect(correct);
       setIsTimerActive(false);
 
+      const timeTaken = Math.floor((Date.now() - questionStartTime) / 1000);
+
+      // Save question attempt
+      try {
+        if (sessionId) {
+          await saveAttempt({
+            sessionId,
+            topic: topic || "",
+            model: model || "",
+            questionText: interpolateTemplate(question?.stem || "", variables),
+            userAnswer,
+            correctAnswer: dynamicAnswer,
+            isCorrect: correct,
+            timeTakenSeconds: timeTaken,
+            hintUsed: showHint,
+            variableValues: variables,
+          });
+
+          // Update user stats
+          updateStats({
+            questionsAttempted: 1,
+            questionsCorrect: correct ? 1 : 0,
+            studyTimeMinutes: Math.ceil(timeTaken / 60),
+          });
+
+          // Update topic progress
+          await updateProgress({ accuracy: correct ? 100 : 0 });
+        }
+      } catch (error) {
+        console.error("Failed to save attempt:", error);
+      }
 
       if (correct) {
         confetti({
@@ -335,7 +399,7 @@
         });
         setIsDynamic(true);
       }
-    }, [userAnswer, model, variables, calculateDynamicAnswer]);
+    }, [userAnswer, model, variables, calculateDynamicAnswer, sessionId, topic, saveAttempt, updateStats, updateProgress, showHint, question, questionStartTime]);
 
 
     useEffect(() => {
@@ -372,6 +436,8 @@
       setIsTimerActive(true);
       setShowHint(false);
       setShowExplanation(false);
+      setAiExplanation("");
+      setQuestionStartTime(Date.now());
     }, []);
 
 
@@ -382,9 +448,22 @@
     }, []);
 
 
-    const handleEnd = useCallback(() => {
+    const handleEnd = useCallback(async () => {
+      if (sessionId) {
+        try {
+          const totalTime = Math.floor((Date.now() - sessionStartTime) / 1000);
+          await endSession({
+            sessionId,
+            totalQuestions: attempts,
+            correctAnswers: isCorrect ? 1 : 0,
+            timeSpentSeconds: totalTime,
+          });
+        } catch (error) {
+          console.error("Failed to end session:", error);
+        }
+      }
       navigate(`/courses/quant/${topic}/${model}`);
-    }, [navigate, topic, model]);
+    }, [navigate, topic, model, sessionId, endSession, attempts, isCorrect, sessionStartTime]);
 
 
     if (!question) {
@@ -668,10 +747,100 @@
                 </CardHeader>
                 <CardContent>
                   {showExplanation ? (
-                    <div className="p-3 rounded-lg bg-secondary/10 border border-secondary/20">
-                      <MathRenderer className="text-sm">
-                        {interpolateTemplate(question.explanation, variables)}
-                      </MathRenderer>
+                    <div className="space-y-3">
+                      <div className="p-3 rounded-lg bg-secondary/10 border border-secondary/20">
+                        <MathRenderer className="text-sm">
+                          {interpolateTemplate(question.explanation, variables)}
+                        </MathRenderer>
+                      </div>
+                      {aiExplanation && (
+                        <div className="p-3 rounded-lg bg-accent/10 border border-accent/20">
+                          <div className="flex items-center gap-2 mb-2 text-accent">
+                            <Sparkles className="h-4 w-4" />
+                            <span className="text-xs font-semibold">AI Explanation</span>
+                          </div>
+                          <MathRenderer className="text-sm">
+                            {aiExplanation}
+                          </MathRenderer>
+                        </div>
+                      )}
+                      {!aiExplanation && isCorrect !== null && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full"
+                          onClick={async () => {
+                            setIsLoadingAI(true);
+                            try {
+                              const response = await fetch(
+                                `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-explanation`,
+                                {
+                                  method: "POST",
+                                  headers: {
+                                    "Content-Type": "application/json",
+                                  },
+                                  body: JSON.stringify({
+                                    questionText: interpolateTemplate(question.stem, variables),
+                                    userAnswer,
+                                    correctAnswer: calculateDynamicAnswer(model || "", variables),
+                                    topic: topic || "",
+                                    model: model || "",
+                                    variables,
+                                  }),
+                                }
+                              );
+
+                              if (!response.ok) {
+                                throw new Error("Failed to generate explanation");
+                              }
+
+                              const reader = response.body?.getReader();
+                              const decoder = new TextDecoder();
+                              let explanation = "";
+
+                              if (reader) {
+                                while (true) {
+                                  const { done, value } = await reader.read();
+                                  if (done) break;
+
+                                  const chunk = decoder.decode(value);
+                                  const lines = chunk.split("\n");
+
+                                  for (const line of lines) {
+                                    if (line.startsWith("data: ")) {
+                                      const data = line.slice(6);
+                                      if (data === "[DONE]") continue;
+                                      try {
+                                        const parsed = JSON.parse(data);
+                                        const content = parsed.choices?.[0]?.delta?.content;
+                                        if (content) {
+                                          explanation += content;
+                                          setAiExplanation(explanation);
+                                        }
+                                      } catch (e) {
+                                        // Skip invalid JSON
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            } catch (error) {
+                              console.error("Failed to get AI explanation:", error);
+                              toast({
+                                title: "Error",
+                                description: "Failed to generate AI explanation",
+                                variant: "destructive",
+                              });
+                            } finally {
+                              setIsLoadingAI(false);
+                            }
+                          }}
+                          disabled={isLoadingAI}
+                        >
+                          <Sparkles className="h-4 w-4 mr-2" />
+                          {isLoadingAI ? "Generating..." : "Get AI Explanation"}
+                        </Button>
+                      )}
                     </div>
                   ) : (
                     <div className="text-center py-6 text-muted-foreground">

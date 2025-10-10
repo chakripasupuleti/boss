@@ -14,6 +14,9 @@ import {
   HelpCircle,
   AlertCircle 
 } from "lucide-react";
+import { useModelStats } from "@/hooks/useModelStats";
+import { useTopicProgress } from "@/hooks/useTopicProgress";
+import { toast } from "@/hooks/use-toast";
 
 const modelContent = {
   "numbers": {
@@ -101,6 +104,25 @@ const modelContent = {
 export default function ModelHub() {
   const { topic, model } = useParams();
   const currentModel = modelContent[topic as keyof typeof modelContent]?.[model as string];
+  
+  const { data: stats, isLoading: statsLoading } = useModelStats(topic || "", model || "");
+  const { progress, updateProgress } = useTopicProgress(topic || "", model || "");
+
+  const handleMarkCompleted = async () => {
+    try {
+      await updateProgress({ isCompleted: true });
+      toast({
+        title: "Success!",
+        description: "Model marked as completed",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to mark as completed",
+        variant: "destructive",
+      });
+    }
+  };
 
   if (!currentModel) {
     return (
@@ -200,9 +222,14 @@ export default function ModelHub() {
                 </Button>
               </Link>
               
-              <Button variant="outline" className="w-full">
+              <Button 
+                variant="outline" 
+                className="w-full"
+                onClick={handleMarkCompleted}
+                disabled={progress?.is_completed}
+              >
                 <Target className="h-4 w-4 mr-2" />
-                Mark as Completed
+                {progress?.is_completed ? "Completed ✓" : "Mark as Completed"}
               </Button>
             </CardContent>
           </Card>
@@ -213,26 +240,32 @@ export default function ModelHub() {
               <CardTitle className="text-lg">Your Progress</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Total Attempts</span>
-                <span className="font-medium">0</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Correct</span>
-                <span className="font-medium text-success">0</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Incorrect</span>
-                <span className="font-medium text-destructive">0</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Accuracy</span>
-                <span className="font-medium">-%</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Best Time</span>
-                <span className="font-medium">-</span>
-              </div>
+              {statsLoading ? (
+                <div className="text-center text-sm text-muted-foreground">Loading stats...</div>
+              ) : (
+                <>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Total Attempts</span>
+                    <span className="font-medium">{stats?.totalAttempts || 0}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Correct</span>
+                    <span className="font-medium text-success">{stats?.correctAttempts || 0}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Incorrect</span>
+                    <span className="font-medium text-destructive">{stats?.incorrectAttempts || 0}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Accuracy</span>
+                    <span className="font-medium">{stats?.accuracy || 0}%</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Best Time</span>
+                    <span className="font-medium">{stats?.bestTime ? `${stats.bestTime}s` : "-"}</span>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </div>

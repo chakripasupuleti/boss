@@ -3,8 +3,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Calculator, Brain, TrendingUp, Clock, Target, Award } from "lucide-react";
+import { useUserStats } from "@/hooks/useUserStats";
 
 export default function Home() {
+  const { stats, isLoading } = useUserStats();
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
       {/* Hero Section */}
@@ -30,8 +33,12 @@ export default function Home() {
             <Target className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">0</div>
-            <p className="text-xs text-muted-foreground">Start your journey</p>
+            <div className="text-2xl font-bold">
+              {isLoading ? "..." : stats?.total_questions_attempted || 0}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {stats?.total_questions_attempted ? "Keep practicing!" : "Start your journey"}
+            </p>
           </CardContent>
         </Card>
         
@@ -41,8 +48,12 @@ export default function Home() {
             <TrendingUp className="h-4 w-4 text-success" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">-%</div>
-            <p className="text-xs text-muted-foreground">Complete questions to see stats</p>
+            <div className="text-2xl font-bold">
+              {isLoading ? "..." : `${stats?.accuracy_percentage?.toFixed(1) || 0}%`}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {stats?.total_questions_attempted ? "Great progress!" : "Complete questions to see stats"}
+            </p>
           </CardContent>
         </Card>
         
@@ -52,8 +63,14 @@ export default function Home() {
             <Clock className="h-4 w-4 text-energy" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">0h</div>
-            <p className="text-xs text-muted-foreground">Track your progress</p>
+            <div className="text-2xl font-bold">
+              {isLoading 
+                ? "..." 
+                : `${((stats?.total_study_time_minutes || 0) / 60).toFixed(1)}h`}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {stats?.total_study_time_minutes ? "Keep it up!" : "Track your progress"}
+            </p>
           </CardContent>
         </Card>
       </div>
