@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calculator, BookOpen, FileText, Play, ChevronRight, Clock, Target } from "lucide-react";
+import { Calculator, BookOpen, FileText, Play, ChevronRight, Clock } from "lucide-react";
 
 const topics = [
   {
@@ -72,9 +72,6 @@ export default function QuantCourse() {
               </p>
               <div className="flex items-center justify-between text-xs">
                 <span className="text-muted-foreground">{topicItem.models} models</span>
-                <span className="text-primary font-medium">
-                  {topicItem.completed}/{topicItem.models} completed
-                </span>
               </div>
             </div>
           ))}
@@ -114,31 +111,16 @@ export default function QuantCourse() {
                           Practice model {modelNum} with dynamic question variations
                         </CardDescription>
                       </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">Attempts</span>
-                          <span className="font-medium">0</span>
-                        </div>
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">Best Score</span>
-                          <span className="font-medium">-</span>
-                        </div>
-                        <div className="flex gap-2">
-                          <Link 
-                            to={`/courses/quant/${selectedTopic}/m${modelNum}`}
-                            className="flex-1"
-                          >
-                            <Button variant="mathematical" className="w-full">
-                              <Play className="h-4 w-4 mr-2" />
-                              Start
-                            </Button>
-                          </Link>
-                          <Link to={`/courses/quant/${selectedTopic}/m${modelNum}/stats`}>
-                            <Button variant="outline" size="icon">
-                              <Target className="h-4 w-4" />
-                            </Button>
-                          </Link>
-                        </div>
+                      <CardContent>
+                        <Link 
+                          to={`/courses/quant/${selectedTopic}/m${modelNum}`}
+                          className="block"
+                        >
+                          <Button variant="mathematical" className="w-full">
+                            <Play className="h-4 w-4 mr-2" />
+                            Start
+                          </Button>
+                        </Link>
                       </CardContent>
                     </Card>
                   ))}

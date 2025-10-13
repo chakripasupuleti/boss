@@ -106,23 +106,6 @@ export default function ModelHub() {
   const currentModel = modelContent[topic as keyof typeof modelContent]?.[model as string];
   
   const { data: stats, isLoading: statsLoading } = useModelStats(topic || "", model || "");
-  const { progress, updateProgress } = useTopicProgress(topic || "", model || "");
-
-  const handleMarkCompleted = async () => {
-    try {
-      await updateProgress({ isCompleted: true });
-      toast({
-        title: "Success!",
-        description: "Model marked as completed",
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to mark as completed",
-        variant: "destructive",
-      });
-    }
-  };
 
   if (!currentModel) {
     return (
@@ -214,23 +197,13 @@ export default function ModelHub() {
               <CardTitle className="text-lg">Practice</CardTitle>
               <CardDescription>Start or resume your practice session</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent>
               <Link to={`/practice/${topic}/${model}`}>
                 <Button variant="mathematical" size="lg" className="w-full">
                   <Play className="h-5 w-5 mr-2" />
                   Start Practice
                 </Button>
               </Link>
-              
-              <Button 
-                variant="outline" 
-                className="w-full"
-                onClick={handleMarkCompleted}
-                disabled={progress?.is_completed}
-              >
-                <Target className="h-4 w-4 mr-2" />
-                {progress?.is_completed ? "Completed ✓" : "Mark as Completed"}
-              </Button>
             </CardContent>
           </Card>
 
