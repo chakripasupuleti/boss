@@ -308,6 +308,7 @@
     const [questionStartTime, setQuestionStartTime] = useState<number>(Date.now());
     const [aiExplanation, setAiExplanation] = useState<string>("");
     const [isLoadingAI, setIsLoadingAI] = useState(false);
+    const [explanationError, setExplanationError] = useState<string>("");
 
 
     const question = practiceQuestions[topic as keyof typeof practiceQuestions]?.[model as string];
@@ -385,6 +386,73 @@
 
           // Update topic progress
           await updateProgress({ accuracy: correct ? 100 : 0 });
+        }
+
+        // Auto-generate AI explanation
+        setIsLoadingAI(true);
+        setAiExplanation("");
+        setExplanationError("");
+        setShowExplanation(true);
+
+        try {
+          const response = await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-explanation`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+              },
+              body: JSON.stringify({
+                questionText: interpolateTemplate(question?.stem || "", variables),
+                userAnswer,
+                correctAnswer: dynamicAnswer,
+                topic: topic || "",
+                model: model || "",
+                variables,
+              }),
+            }
+          );
+
+          if (!response.ok) {
+            throw new Error("Failed to generate explanation");
+          }
+
+          const reader = response.body?.getReader();
+          const decoder = new TextDecoder();
+          let explanation = "";
+
+          if (reader) {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+
+              const chunk = decoder.decode(value);
+              const lines = chunk.split("\n");
+
+              for (const line of lines) {
+                if (line.startsWith("data: ")) {
+                  const data = line.slice(6);
+                  if (data === "[DONE]") continue;
+                  try {
+                    const parsed = JSON.parse(data);
+                    const content = parsed.choices?.[0]?.delta?.content;
+                    if (content) {
+                      explanation += content;
+                      setAiExplanation(explanation);
+                    }
+                  } catch (e) {
+                    // Skip invalid JSON
+                  }
+                }
+              }
+            }
+          }
+        } catch (error) {
+          console.error("Error generating AI explanation:", error);
+          setExplanationError("Failed to generate explanation. Please refresh to try again.");
+        } finally {
+          setIsLoadingAI(false);
         }
       } catch (error) {
         console.error("Failed to save attempt:", error);
@@ -748,98 +816,29 @@
                 <CardContent>
                   {showExplanation ? (
                     <div className="space-y-3">
-                      <div className="p-3 rounded-lg bg-secondary/10 border border-secondary/20">
-                        <MathRenderer className="text-sm">
-                          {interpolateTemplate(question.explanation, variables)}
-                        </MathRenderer>
-                      </div>
+                      {isLoadingAI && !aiExplanation && (
+                        <div className="p-3 rounded-lg bg-accent/10 border border-accent/20">
+                          <div className="flex items-center gap-2 text-accent">
+                            <Sparkles className="h-4 w-4 animate-pulse" />
+                            <span className="text-sm">Generating AI explanation...</span>
+                          </div>
+                        </div>
+                      )}
+                      {explanationError && (
+                        <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+                          <p className="text-sm text-destructive">{explanationError}</p>
+                        </div>
+                      )}
                       {aiExplanation && (
                         <div className="p-3 rounded-lg bg-accent/10 border border-accent/20">
                           <div className="flex items-center gap-2 mb-2 text-accent">
                             <Sparkles className="h-4 w-4" />
                             <span className="text-xs font-semibold">AI Explanation</span>
                           </div>
-                          <MathRenderer className="text-sm">
+                          <MathRenderer className="text-sm leading-relaxed">
                             {aiExplanation}
                           </MathRenderer>
                         </div>
-                      )}
-                      {!aiExplanation && isCorrect !== null && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-full"
-                          onClick={async () => {
-                            setIsLoadingAI(true);
-                            try {
-                              const response = await fetch(
-                                `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-explanation`,
-                                {
-                                  method: "POST",
-                                  headers: {
-                                    "Content-Type": "application/json",
-                                  },
-                                  body: JSON.stringify({
-                                    questionText: interpolateTemplate(question.stem, variables),
-                                    userAnswer,
-                                    correctAnswer: calculateDynamicAnswer(model || "", variables),
-                                    topic: topic || "",
-                                    model: model || "",
-                                    variables,
-                                  }),
-                                }
-                              );
-
-                              if (!response.ok) {
-                                throw new Error("Failed to generate explanation");
-                              }
-
-                              const reader = response.body?.getReader();
-                              const decoder = new TextDecoder();
-                              let explanation = "";
-
-                              if (reader) {
-                                while (true) {
-                                  const { done, value } = await reader.read();
-                                  if (done) break;
-
-                                  const chunk = decoder.decode(value);
-                                  const lines = chunk.split("\n");
-
-                                  for (const line of lines) {
-                                    if (line.startsWith("data: ")) {
-                                      const data = line.slice(6);
-                                      if (data === "[DONE]") continue;
-                                      try {
-                                        const parsed = JSON.parse(data);
-                                        const content = parsed.choices?.[0]?.delta?.content;
-                                        if (content) {
-                                          explanation += content;
-                                          setAiExplanation(explanation);
-                                        }
-                                      } catch (e) {
-                                        // Skip invalid JSON
-                                      }
-                                    }
-                                  }
-                                }
-                              }
-                            } catch (error) {
-                              console.error("Failed to get AI explanation:", error);
-                              toast({
-                                title: "Error",
-                                description: "Failed to generate AI explanation",
-                                variant: "destructive",
-                              });
-                            } finally {
-                              setIsLoadingAI(false);
-                            }
-                          }}
-                          disabled={isLoadingAI}
-                        >
-                          <Sparkles className="h-4 w-4 mr-2" />
-                          {isLoadingAI ? "Generating..." : "Get AI Explanation"}
-                        </Button>
                       )}
                     </div>
                   ) : (

@@ -2,8 +2,60 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { MapPin, Clock, Target, Trophy } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useUserStats } from "@/hooks/useUserStats";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Journey() {
+  const { user } = useAuth();
+  const { stats, isLoading: statsLoading } = useUserStats();
+
+  // Fetch completed topics count
+  const { data: topicProgress } = useQuery({
+    queryKey: ["allTopicProgress", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const { data } = await supabase
+        .from("topic_progress")
+        .select("*")
+        .eq("user_id", user.id);
+      return data || [];
+    },
+    enabled: !!user?.id,
+  });
+
+  // Fetch achievements
+  const { data: achievements } = useQuery({
+    queryKey: ["allAchievements", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const { data } = await supabase
+        .from("achievements")
+        .select("*")
+        .eq("user_id", user.id);
+      return data || [];
+    },
+    enabled: !!user?.id,
+  });
+
+  // Calculate course completion
+  const totalModels = 12; // 3 topics × 4 models
+  const completedModels = topicProgress?.filter((p) => p.is_completed).length || 0;
+  const courseCompletion = Math.round((completedModels / totalModels) * 100);
+
+  // Check milestone completion
+  const hasCompletedTopic = topicProgress?.some((p) => p.is_completed) || false;
+  const hasPerfectScore = (stats?.accuracy_percentage || 0) === 100 && (stats?.total_questions_attempted || 0) > 0;
+
+  // Format study time
+  const studyHours = Math.floor((stats?.total_study_time_minutes || 0) / 60);
+  const studyMinutes = (stats?.total_study_time_minutes || 0) % 60;
+  const studyTimeDisplay = studyHours > 0 
+    ? `${studyHours}h ${studyMinutes}m` 
+    : `${studyMinutes}m`;
+
   return (
     <div className="p-6 max-w-4xl mx-auto">
       <div className="mb-8">
@@ -25,15 +77,31 @@ export default function Journey() {
         <CardContent className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="text-center">
-              <div className="text-3xl font-bold text-primary mb-1">0</div>
+              {statsLoading ? (
+                <Skeleton className="h-10 w-20 mx-auto mb-1" />
+              ) : (
+                <div className="text-3xl font-bold text-primary mb-1">
+                  {stats?.total_questions_attempted || 0}
+                </div>
+              )}
               <div className="text-sm text-muted-foreground">Questions Completed</div>
             </div>
             <div className="text-center">
-              <div className="text-3xl font-bold text-success mb-1">0%</div>
+              {statsLoading ? (
+                <Skeleton className="h-10 w-20 mx-auto mb-1" />
+              ) : (
+                <div className="text-3xl font-bold text-success mb-1">
+                  {Math.round(stats?.accuracy_percentage || 0)}%
+                </div>
+              )}
               <div className="text-sm text-muted-foreground">Average Accuracy</div>
             </div>
             <div className="text-center">
-              <div className="text-3xl font-bold text-energy mb-1">0h</div>
+              {statsLoading ? (
+                <Skeleton className="h-10 w-20 mx-auto mb-1" />
+              ) : (
+                <div className="text-3xl font-bold text-energy mb-1">{studyTimeDisplay}</div>
+              )}
               <div className="text-sm text-muted-foreground">Total Study Time</div>
             </div>
           </div>
@@ -41,9 +109,17 @@ export default function Journey() {
           <div className="space-y-3">
             <div className="flex justify-between text-sm">
               <span>Course Completion</span>
-              <span>0%</span>
+              {statsLoading ? (
+                <Skeleton className="h-4 w-12" />
+              ) : (
+                <span>{courseCompletion}%</span>
+              )}
             </div>
-            <Progress value={0} className="h-3" />
+            {statsLoading ? (
+              <Skeleton className="h-3 w-full" />
+            ) : (
+              <Progress value={courseCompletion} className="h-3" />
+            )}
           </div>
         </CardContent>
       </Card>
@@ -82,20 +158,26 @@ export default function Journey() {
 
             {/* First Course */}
             <div className="flex items-start gap-4">
-              <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center border-4 border-background relative z-10">
-                <Clock className="h-4 w-4 text-muted-foreground" />
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center border-4 border-background relative z-10 ${
+                hasCompletedTopic ? 'bg-success' : 'bg-muted'
+              }`}>
+                <Clock className={`h-4 w-4 ${hasCompletedTopic ? 'text-success-foreground' : 'text-muted-foreground'}`} />
               </div>
-              <Card className="flex-1 opacity-60">
+              <Card className={`flex-1 ${hasCompletedTopic ? '' : 'opacity-60'}`}>
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-lg">Complete First Topic</CardTitle>
-                    <Badge variant="outline">Upcoming</Badge>
+                    <Badge variant={hasCompletedTopic ? "secondary" : "outline"}>
+                      {hasCompletedTopic ? "Completed" : "Upcoming"}
+                    </Badge>
                   </div>
                   <CardDescription>Finish your first topic in Quantitative Aptitude</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground">
-                    Choose from Numbers, LCM & HCF, or Percentages to start your learning journey.
+                    {hasCompletedTopic 
+                      ? "Great job! You've completed your first topic."
+                      : "Choose from Numbers, LCM & HCF, or Percentages to start your learning journey."}
                   </p>
                 </CardContent>
               </Card>
@@ -103,41 +185,26 @@ export default function Journey() {
 
             {/* First Perfect Score */}
             <div className="flex items-start gap-4">
-              <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center border-4 border-background relative z-10">
-                <Trophy className="h-4 w-4 text-muted-foreground" />
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center border-4 border-background relative z-10 ${
+                hasPerfectScore ? 'bg-success' : 'bg-muted'
+              }`}>
+                <Trophy className={`h-4 w-4 ${hasPerfectScore ? 'text-success-foreground' : 'text-muted-foreground'}`} />
               </div>
-              <Card className="flex-1 opacity-60">
+              <Card className={`flex-1 ${hasPerfectScore ? '' : 'opacity-60'}`}>
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-lg">First Perfect Score</CardTitle>
-                    <Badge variant="outline">Upcoming</Badge>
+                    <Badge variant={hasPerfectScore ? "secondary" : "outline"}>
+                      {hasPerfectScore ? "Completed" : "Upcoming"}
+                    </Badge>
                   </div>
                   <CardDescription>Get your first question correct on the first try</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground">
-                    Show your mastery by solving a question correctly within the time limit.
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Speed Master */}
-            <div className="flex items-start gap-4">
-              <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center border-4 border-background relative z-10">
-                <Clock className="h-4 w-4 text-muted-foreground" />
-              </div>
-              <Card className="flex-1 opacity-60">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg">Speed Master</CardTitle>
-                    <Badge variant="outline">Upcoming</Badge>
-                  </div>
-                  <CardDescription>Solve a question in under 30 seconds</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">
-                    Demonstrate your expertise by solving questions quickly and accurately.
+                    {hasPerfectScore
+                      ? "Excellent! You've achieved perfect accuracy."
+                      : "Show your mastery by solving a question correctly within the time limit."}
                   </p>
                 </CardContent>
               </Card>
@@ -158,13 +225,13 @@ export default function Journey() {
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
-              { name: "First Steps", description: "Started your journey", locked: false },
-              { name: "Quick Learner", description: "Complete first topic", locked: true },
-              { name: "Perfect Score", description: "100% accuracy", locked: true },
+              { name: "First Steps", description: "Started your journey", locked: !user },
+              { name: "Quick Learner", description: "Complete first topic", locked: !hasCompletedTopic },
+              { name: "Perfect Score", description: "100% accuracy", locked: !hasPerfectScore },
               { name: "Speed Demon", description: "Under 30s solve", locked: true },
               { name: "Consistency", description: "7-day streak", locked: true },
               { name: "Explorer", description: "Try all topics", locked: true },
-              { name: "Master", description: "Complete all models", locked: true },
+              { name: "Master", description: "Complete all models", locked: completedModels < totalModels },
               { name: "Champion", description: "Top performer", locked: true }
             ].map((achievement) => (
               <div
