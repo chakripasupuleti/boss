@@ -16,12 +16,12 @@ export default function Courses() {
     queryKey: ["courseProgress", user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
-      
+
       const { data, error } = await supabase
         .from("topic_progress")
         .select("topic, model, is_completed")
         .eq("user_id", user.id);
-      
+
       if (error) throw error;
       return data;
     },
@@ -32,11 +32,17 @@ export default function Courses() {
   const quantTopics = ["numbers", "lcm_hcf", "percentages"];
   const totalModels = quantTopics.length * 4; // 3 topics × 4 models = 12
 
+  // Calculate completed models based on topicProgress
   const completedModels = topicProgress?.filter(
     (tp) => quantTopics.includes(tp.topic) && tp.is_completed
   ).length || 0;
 
-  const progressPercentage = Math.round((completedModels / totalModels) * 100);
+  // Ensure the progress percentage never exceeds 100%
+  const progressPercentage = Math.min(
+    Math.round((completedModels / totalModels) * 100),
+    100
+  );
+
   return (
     <div className="p-6 max-w-6xl mx-auto">
       <div className="mb-8">
