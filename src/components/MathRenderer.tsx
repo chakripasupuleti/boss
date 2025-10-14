@@ -15,7 +15,16 @@ interface MathRendererProps {
  * Supports mixed plain text + multiple math segments in one string.
  */
 export function MathRenderer({ children, className }: MathRendererProps) {
-  const text = String(children ?? "");
+  let text = String(children ?? "");
+
+  // Preprocess: Fix common AI formatting issues
+  text = text
+    // Replace \( \) with $ $
+    .replace(/\\\(/g, '$')
+    .replace(/\\\)/g, '$')
+    // Replace \[ \] with $$ $$
+    .replace(/\\\[/g, '$$')
+    .replace(/\\\]/g, '$$');
 
   // Order matters: $$...$$ | \[...\] | \(...\) | $...$
   // Non-greedy ([\s\S]+?) so we don't over-capture; supports newlines.

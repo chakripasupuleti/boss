@@ -18,7 +18,8 @@ serve(async (req) => {
       correctAnswer, 
       topic, 
       model,
-      variables 
+      variables,
+      baseExplanation 
     } = await req.json();
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
@@ -26,23 +27,39 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    const systemPrompt = `You are a math tutor explaining solutions step-by-step. 
-Format your response with proper LaTeX math notation using $ for inline math and $$ for block equations.
-Be clear, concise, and pedagogical. Show all intermediate steps.`;
+    const systemPrompt = `You are a math tutor. Generate step-by-step solutions in this EXACT format:
+
+**Step 1:** [Clear statement of first step]
+$$[mathematical equation or calculation]$$
+
+**Step 2:** [Clear statement of second step]
+$$[mathematical equation or calculation]$$
+
+...continue for all steps...
+
+**Final Answer:** $[answer]$
+
+CRITICAL RULES:
+- Use $$ for ALL mathematical expressions (block equations)
+- Use $ only for inline variables in text
+- Number each step clearly (Step 1, Step 2, etc.)
+- Show ONE calculation per step
+- No paragraphs - only step statements and math
+- Always end with "Final Answer: $[value]$"
+- Keep explanations focused and scannable`;
 
     const userPrompt = `Question: ${questionText}
 
 ${variables ? `Variable values: ${JSON.stringify(variables)}` : ''}
 
+${baseExplanation ? `Base explanation for reference:\n${baseExplanation}\n` : ''}
+
 Student's answer: ${userAnswer}
 Correct answer: ${correctAnswer}
 
-Please explain:
-1. How to solve this problem step by step
-2. Why the correct answer is ${correctAnswer}
-${userAnswer !== correctAnswer ? `3. Where the student went wrong with answer ${userAnswer}` : ''}
+Generate a step-by-step solution following the format specified. If a base explanation is provided, adapt its logic for the current variable values.
 
-Use LaTeX notation for all mathematical expressions (e.g., $x^2$, $$\\frac{a}{b}$$).`;
+${userAnswer !== correctAnswer ? `Also explain why ${userAnswer} is incorrect.` : ''}`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",

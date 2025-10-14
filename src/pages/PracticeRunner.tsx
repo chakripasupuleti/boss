@@ -70,11 +70,30 @@
     const base = vars.base ?? 5;
     const exponent = vars.exponent ?? 104;
     const modulus = vars.modulus ?? 7;
+    
+    // Find the actual multiplicative order (cycle length)
+    let order = 1;
+    let currentMod = base % modulus;
+    const startVal = currentMod;
+    while (order < modulus) {
+      currentMod = (currentMod * base) % modulus;
+      if (currentMod === startVal) break;
+      order++;
+    }
+    const cycle_length = order;
+    const remainder_exp = exponent % cycle_length;
+    
+    // Calculate base^remainder_exp mod modulus
+    let power_result = 1;
+    for (let i = 0; i < remainder_exp; i++) {
+      power_result = (power_result * base) % modulus;
+    }
+    const remainder_answer = power_result;
+    
+    // Keep old variables for backward compatibility in templates
     const modulus_minus_1 = modulus - 1;
     const quotient = Math.floor(exponent / modulus_minus_1);
-    const remainder_exp = exponent % modulus_minus_1;
     const base_power_result = Math.pow(base, remainder_exp);
-    const remainder_answer = base_power_result % modulus;
 
 
     // Numbers M4
@@ -309,6 +328,7 @@
     const [aiExplanation, setAiExplanation] = useState<string>("");
     const [isLoadingAI, setIsLoadingAI] = useState(false);
     const [explanationError, setExplanationError] = useState<string>("");
+    const [isBaseQuestion, setIsBaseQuestion] = useState(true);
 
 
     const question = practiceQuestions[topic as keyof typeof practiceQuestions]?.[model as string];
@@ -388,71 +408,87 @@
           await updateProgress({ accuracy: correct ? 100 : 0 });
         }
 
-        // Auto-generate AI explanation
-        setIsLoadingAI(true);
-        setAiExplanation("");
-        setExplanationError("");
-        setShowExplanation(true);
+        // Use existing explanation for base question, generate AI for variants
+        if (isBaseQuestion && question.explanation) {
+          // Use pre-written explanation for base question
+          setAiExplanation(interpolateTemplate(question.explanation, variables));
+          setShowExplanation(true);
+        } else {
+          // Generate AI explanation for slider variants
+          setIsLoadingAI(true);
+          setAiExplanation("");
+          setExplanationError("");
+          setShowExplanation(true);
 
-        try {
-          const response = await fetch(
-            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-explanation`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-              },
-              body: JSON.stringify({
-                questionText: interpolateTemplate(question?.stem || "", variables),
-                userAnswer,
-                correctAnswer: dynamicAnswer,
-                topic: topic || "",
-                model: model || "",
-                variables,
-              }),
+          try {
+            const response = await fetch(
+              `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-explanation`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+                },
+                body: JSON.stringify({
+                  questionText: interpolateTemplate(question?.stem || "", variables),
+                  userAnswer,
+                  correctAnswer: dynamicAnswer,
+                  topic: topic || "",
+                  model: model || "",
+                  variables,
+                  baseExplanation: question.explanation,
+                }),
+              }
+            );
+
+            if (!response.ok) {
+              if (response.status === 429) {
+                setExplanationError("Rate limit exceeded. Please try again later.");
+                return;
+              }
+              if (response.status === 402) {
+                setExplanationError("AI usage limit reached. Please add credits to continue.");
+                return;
+              }
+              throw new Error("Failed to generate explanation");
             }
-          );
 
-          if (!response.ok) {
-            throw new Error("Failed to generate explanation");
-          }
+            const reader = response.body?.getReader();
+            const decoder = new TextDecoder();
+            let explanation = "";
 
-          const reader = response.body?.getReader();
-          const decoder = new TextDecoder();
-          let explanation = "";
+            if (reader) {
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
 
-          if (reader) {
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
+                const chunk = decoder.decode(value);
+                const lines = chunk.split("\n");
 
-              const chunk = decoder.decode(value);
-              const lines = chunk.split("\n");
-
-              for (const line of lines) {
-                if (line.startsWith("data: ")) {
-                  const data = line.slice(6);
-                  if (data === "[DONE]") continue;
-                  try {
-                    const parsed = JSON.parse(data);
-                    const content = parsed.choices?.[0]?.delta?.content;
-                    if (content) {
-                      explanation += content;
-                      setAiExplanation(explanation);
+                for (const line of lines) {
+                  if (line.startsWith("data: ")) {
+                    const data = line.slice(6);
+                    if (data === "[DONE]") continue;
+                    try {
+                      const parsed = JSON.parse(data);
+                      const content = parsed.choices?.[0]?.delta?.content;
+                      if (content) {
+                        explanation += content;
+                        setAiExplanation(explanation);
+                      }
+                    } catch (e) {
+                      // Skip invalid JSON
                     }
-                  } catch (e) {
-                    // Skip invalid JSON
                   }
                 }
               }
             }
+          } catch (error) {
+            console.error("Error generating AI explanation:", error);
+            setExplanationError("Failed to generate explanation. Please refresh to try again.");
+          } finally {
+            setIsLoadingAI(false);
           }
-        } catch (error) {
-          console.error("Error generating AI explanation:", error);
-          setExplanationError("Failed to generate explanation. Please refresh to try again.");
-        } finally {
-          setIsLoadingAI(false);
         }
       } catch (error) {
         console.error("Failed to save attempt:", error);
@@ -497,6 +533,7 @@
 
     const handleVariableChange = useCallback((key: string, value: number) => {
       setVariables((prev) => ({ ...prev, [key]: value }));
+      setIsBaseQuestion(false); // Mark as variant
       setAttempts((prev) => prev + 1);
       setUserAnswer("");
       setIsCorrect(null);
