@@ -29,7 +29,7 @@ export default function Courses() {
   });
 
   // Calculate Quantitative Aptitude progress
-  const quantTopics = ["numbers", "lcm_hcf", "percentages"];
+  const quantTopics = ["numbers", "lcm-hcf", "percentages"];
   const totalModels = quantTopics.length * 4; // 3 topics × 4 models = 12
 
   // Calculate completed models based on topicProgress
@@ -37,11 +37,14 @@ export default function Courses() {
     (tp) => quantTopics.includes(tp.topic) && tp.is_completed
   ).length || 0;
 
+
   // Ensure the progress percentage never exceeds 100%
   const progressPercentage = Math.min(
     Math.round((completedModels / totalModels) * 100),
     100
   );
+
+  console.log(progressPercentage, completedModels, totalModels);
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
