@@ -3,9 +3,40 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Calculator, Brain, Lock, ChevronRight } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function Courses() {
+  const { user } = useAuth();
+
+  const { data: topicProgress, isLoading } = useQuery({
+    queryKey: ["courseProgress", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      
+      const { data, error } = await supabase
+        .from("topic_progress")
+        .select("topic, model, is_completed")
+        .eq("user_id", user.id);
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user?.id,
+  });
+
+  // Calculate Quantitative Aptitude progress
+  const quantTopics = ["numbers", "lcm_hcf", "percentages"];
+  const totalModels = quantTopics.length * 4; // 3 topics × 4 models = 12
+
+  const completedModels = topicProgress?.filter(
+    (tp) => quantTopics.includes(tp.topic) && tp.is_completed
+  ).length || 0;
+
+  const progressPercentage = Math.round((completedModels / totalModels) * 100);
   return (
     <div className="p-6 max-w-6xl mx-auto">
       <div className="mb-8">
@@ -43,9 +74,17 @@ export default function Courses() {
             <div>
               <div className="flex justify-between text-sm mb-2">
                 <span className="font-medium">Course Progress</span>
-                <span className="text-muted-foreground">0%</span>
+                {isLoading ? (
+                  <Skeleton className="h-4 w-8" />
+                ) : (
+                  <span className="text-muted-foreground">{progressPercentage}%</span>
+                )}
               </div>
-              <Progress value={0} className="h-2" />
+              {isLoading ? (
+                <Skeleton className="h-2 w-full" />
+              ) : (
+                <Progress value={progressPercentage} className="h-2" />
+              )}
             </div>
 
             {/* Topics */}
