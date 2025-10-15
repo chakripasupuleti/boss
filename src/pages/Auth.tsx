@@ -8,6 +8,43 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
+import { z } from "zod";
+
+// Validation schemas for security
+const loginSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .email({ message: "Please enter a valid email address" })
+    .max(255, { message: "Email must be less than 255 characters" }),
+  password: z
+    .string()
+    .min(6, { message: "Password must be at least 6 characters" })
+    .max(72, { message: "Password must be less than 72 characters" }),
+});
+
+const signupSchema = z.object({
+  fullName: z
+    .string()
+    .trim()
+    .min(1, { message: "Name cannot be empty" })
+    .max(100, { message: "Name must be less than 100 characters" })
+    .regex(/^[a-zA-Z\s'-]+$/, { 
+      message: "Name can only contain letters, spaces, hyphens, and apostrophes" 
+    }),
+  email: z
+    .string()
+    .trim()
+    .email({ message: "Please enter a valid email address" })
+    .max(255, { message: "Email must be less than 255 characters" }),
+  password: z
+    .string()
+    .min(8, { message: "Password must be at least 8 characters" })
+    .max(72, { message: "Password must be less than 72 characters" })
+    .regex(/[A-Z]/, { message: "Password must contain at least one uppercase letter" })
+    .regex(/[a-z]/, { message: "Password must contain at least one lowercase letter" })
+    .regex(/[0-9]/, { message: "Password must contain at least one number" }),
+});
 
 export default function Auth() {
   const navigate = useNavigate();
@@ -24,9 +61,15 @@ export default function Auth() {
     setIsLoading(true);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      // Validate input before processing
+      const validated = loginSchema.parse({
         email: loginEmail,
         password: loginPassword,
+      });
+
+      const { error } = await supabase.auth.signInWithPassword({
+        email: validated.email,
+        password: validated.password,
       });
 
       if (error) throw error;
@@ -38,11 +81,19 @@ export default function Auth() {
       
       navigate("/");
     } catch (error: any) {
-      toast({
-        title: "Login failed",
-        description: error.message,
-        variant: "destructive",
-      });
+      if (error instanceof z.ZodError) {
+        toast({
+          title: "Validation Error",
+          description: error.errors[0].message,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Login failed",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -53,12 +104,19 @@ export default function Auth() {
     setIsLoading(true);
 
     try {
-      const { error } = await supabase.auth.signUp({
+      // Validate input before processing
+      const validated = signupSchema.parse({
+        fullName: signupName,
         email: signupEmail,
         password: signupPassword,
+      });
+
+      const { error } = await supabase.auth.signUp({
+        email: validated.email,
+        password: validated.password,
         options: {
           data: {
-            full_name: signupName,
+            full_name: validated.fullName,
           },
           emailRedirectTo: `${window.location.origin}/`,
         },
@@ -73,11 +131,19 @@ export default function Auth() {
       
       navigate("/");
     } catch (error: any) {
-      toast({
-        title: "Signup failed",
-        description: error.message,
-        variant: "destructive",
-      });
+      if (error instanceof z.ZodError) {
+        toast({
+          title: "Validation Error",
+          description: error.errors[0].message,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Signup failed",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsLoading(false);
     }

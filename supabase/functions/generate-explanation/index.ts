@@ -22,6 +22,56 @@ serve(async (req) => {
       baseExplanation 
     } = await req.json();
 
+    // Validate inputs to prevent abuse and excessive token consumption
+    if (!questionText || typeof questionText !== 'string' || questionText.length > 2000) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid question text' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!userAnswer || typeof userAnswer !== 'string' || userAnswer.length > 500) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid user answer' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!correctAnswer || typeof correctAnswer !== 'string' || correctAnswer.length > 500) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid correct answer' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!topic || typeof topic !== 'string' || topic.length > 100) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid topic' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!model || typeof model !== 'string' || model.length > 100) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid model' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (variables && (typeof variables !== 'object' || Array.isArray(variables))) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid variables format' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (baseExplanation && (typeof baseExplanation !== 'string' || baseExplanation.length > 5000)) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid base explanation' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");
