@@ -79,24 +79,26 @@ serve(async (req) => {
 
     const systemPrompt = `You are a math tutor. Generate step-by-step solutions in this EXACT format:
 
-**Step 1:**
+Step 1:
 $$[mathematical equation or calculation]$$
 
-**Step 2:** 
+Step 2: 
 $$[mathematical equation or calculation]$$
 
 ...continue for all steps...
 
-**Final Answer:** $[answer]$
+Final Answer: $[answer]$
 
 CRITICAL RULES:
+- NEVER use ** for bold formatting - use plain text only
 - Use $$ for ALL mathematical expressions (block equations)
 - Use $ only for inline variables in text
-- Number each step clearly (Step 1, Step 2, etc.)
+- Number each step clearly (Step 1, Step 2, etc.) without any asterisks
 - Show ONE calculation per step
 - No paragraphs - only step statements and math
-- Always end with "Final Answer: $[value]$"
-- Keep explanations focused and scannable`;
+- Always end with "Final Answer: $[value]$" (no asterisks)
+- Keep explanations focused and scannable
+- Ensure all LaTeX is properly formatted with correct delimiters`;
 
     const userPrompt = `Question: ${questionText}
 

@@ -10,7 +10,7 @@
   import { Separator } from "@/components/ui/separator";
   import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
   import { MathRenderer } from "@/components/MathRenderer";
-  import { X, Clock, HelpCircle, Eye, EyeOff, Check, AlertCircle, Sparkles } from "lucide-react";
+  import { X, Clock, HelpCircle, Eye, EyeOff, Check, AlertCircle, Sparkles, Lightbulb, BookOpen } from "lucide-react";
   import confetti from "canvas-confetti";
   import { useUserStats } from "@/hooks/useUserStats";
   import { usePracticeSession } from "@/hooks/usePracticeSession";
@@ -137,7 +137,10 @@
 
     // LCM ratio
     const ratio1 = vars.ratio1 || 2, ratio2 = vars.ratio2 || 3, r_hcf = vars.hcf || 9;
-    const ratio_lcm = (ratio1 * r_hcf * ratio2);
+    const num1_calc = ratio1 * r_hcf;
+    const num2_calc = ratio2 * r_hcf;
+    const product_calc = num1_calc * num2_calc;
+    const ratio_lcm = product_calc / r_hcf;
 
 
     // LCM greatest length
@@ -158,7 +161,11 @@
 
     // Percentages M3 (percent decrease)
     const original = vars.original || 40, current = vars.current || 29;
-    const percent_decrease = (((original - current) / original) * 100).toFixed(1);
+    const decrease_value = original - current;
+    const percent_decrease_raw = (decrease_value / original) * 100;
+    const percent_decrease = Number.isInteger(percent_decrease_raw) 
+      ? String(percent_decrease_raw) 
+      : percent_decrease_raw.toFixed(1);
 
 
     // Percentages M4 (chain percent, also showing with number as unit)
@@ -176,10 +183,10 @@
       frac1_num: nums[0], frac2_num: nums[1], frac3_num: nums[2],
       frac1_den: dens[0], frac2_den: dens[1], frac3_den: dens[2],
       numerator_lcm, denominator_gcd, fraction_lcm,
-      ratio1, ratio2, hcf: r_hcf, ratio_lcm,
+      ratio1, ratio2, hcf: r_hcf, ratio_lcm, num1_calc, num2_calc, product_calc,
       length1, length2, length3, lengths_gcd,
       percent1, percent2, percent_of_A, numerator1, denominator1, numerator2, denominator2, fraction_percent,
-      original, current, percent_decrease,
+      original, current, decrease_value, percent_decrease,
       chain_percent: `${chain_percent}`,
       chain_result,
       number: vars.number || 300,
@@ -204,16 +211,16 @@
     numbers: {
       m1: {
         stem: "Calculate the value of $i^{${power}} + ${constant}$, where $i$ is the imaginary unit.",
-        hint: "Powers of $i$ repeat every 4: $i^1 = i$, $i^2 = -1$, $i^3 = -i$, $i^4 = 1$. Find $${power} \\bmod 4$.",
+        hint: "Powers of $i$ repeat every 4: $i^1 = i$, $i^2 = -1$, $i^3 = -i$, $i^4 = 1$. Find the remainder when ${power} is divided by 4.",
         answer: "${final_answer}",
-        explanation: "Since $i^4 = 1$, $i^{${power}} = i^{${power_mod_4}}$. The cycle: $i^0=1$, $i^1=i$, $i^2=-1$, $i^3=-i$. Since $${power} \\bmod 4 = ${power_mod_4}$, $i^{${power}} = ${i_power_value}$. So $i^{${power}} + ${constant} = ${i_power_value} + ${constant} = ${final_answer}$.",
+        explanation: "Step 1:\n$$i^4 = 1 \\text{, so powers repeat every 4}$$\n\nStep 2:\n$$${power} \\bmod 4 = ${power_mod_4}$$\n\nStep 3:\n$$i^{${power}} = i^{${power_mod_4}} = ${i_power_value}$$\n\nStep 4:\n$$i^{${power}} + ${constant} = ${i_power_value} + ${constant} = ${final_answer}$$\n\nFinal Answer: $${final_answer}$",
         variables: { power: { min: 20, max: 100, default: 28 }, constant: { min: 1, max: 5, default: 2 } }
       },
       m2: {
         stem: "Express $${whole}.\\overline{${recurring}}$ in its simplest rational form.",
-        hint: "Let $x = ${whole}.\\overline{${recurring}}$, $10x = ${whole}${recurring}.\\overline{${recurring}}$. Subtract to eliminate recurring part.",
+        hint: "Let $x = ${whole}.\\overline{${recurring}}$, then multiply by 10 and subtract to eliminate the recurring part.",
         answer: "${simplified_fraction}",
-        explanation: "Let $x = ${whole}.\\overline{${recurring}}$. Then $10x = ${whole}${recurring}.\\overline{${recurring}}$. $10x-x=${difference}$. $9x=${difference}$ so $x=\\dfrac{${difference}}{9}=\\dfrac{${simplified_numerator}}{${simplified_denominator}}$.",
+        explanation: "Step 1:\n$$\\text{Let } x = ${whole}.\\overline{${recurring}}$$\n\nStep 2:\n$$10x = ${whole}${recurring}.\\overline{${recurring}}$$\n\nStep 3:\n$$10x - x = ${difference}$$\n\nStep 4:\n$$9x = ${difference}$$\n\nStep 5:\n$$x = \\frac{${difference}}{9} = \\frac{${simplified_numerator}}{${simplified_denominator}}$$\n\nFinal Answer: $\\frac{${simplified_numerator}}{${simplified_denominator}}$",
         variables: { whole: { min: 1, max: 9, default: 3 }, recurring: { min: 1, max: 9, default: 6 } }
       },
       m3: {
@@ -234,69 +241,69 @@
 
       m4: {
         stem: "Find the smallest value of $x$ such that $2579x25963$ is divisible by $11$.",
-        hint: "Divisibility by $11$ requires alternating sum of digits to be a multiple of $11$ or equal to zero(0).",
+        hint: "For divisibility by 11, the alternating sum of digits must be divisible by 11 or equal to 0.",
         answer: "${correct_div11_x}",
-        explanation: "Sum: $2-5+7-9+x-2+5-9+6-3 = $x-{div_rule_sum}$. For divisibility, $(${div_rule_sum}-x) \\equiv 0 \\pmod{11}$, so $x=${correct_div11_x}$.",
-        variables: { div_rule_sum: { min: 1, max: 20, default: 4 } }
+        explanation: "Step 1:\n$$\\text{Alternating sum: } 2-5+7-9+x-2+5-9+6-3$$\n\nStep 2:\n$$= x - 8$$\n\nStep 3:\n$$\\text{For divisibility by 11: } (x-8) \\equiv 0 \\pmod{11}$$\n\nStep 4:\n$$x \\equiv 8 \\pmod{11}$$\n\nStep 5:\n$$\\text{Smallest single digit: } x = 8$$\n\nFinal Answer: $8$",
+        variables: { div_rule_sum: { min: 8, max: 8, default: 8 } }
       }
     },
     "lcm-hcf": {
       m1: {
         stem: "Find both the HCF and LCM of $${num1}$ and $${num2}$.Format:HCF: , LCM: ",
-        hint: "Prime factorize: $${num1} = ${num1_factors}$, $${num2} = ${num2_factors}$.",
+        hint: "Use prime factorization: Take lowest powers for HCF, highest powers for LCM.",
         answer: "HCF: ${hcf_result}, LCM: ${lcm_result}",
-        explanation: "$${num1} = ${num1_factors}$, $${num2} = ${num2_factors}$. HCF: ${hcf_result}, LCM: ${lcm_result}.",
+        explanation: "Step 1:\n$$${num1} = ${num1_factors}$$\n\nStep 2:\n$$${num2} = ${num2_factors}$$\n\nStep 3:\n$$\\text{HCF (common factors, lowest powers)} = ${hcf_result}$$\n\nStep 4:\n$$\\text{LCM (all factors, highest powers)} = ${lcm_result}$$\n\nFinal Answer: HCF: $${hcf_result}$, LCM: $${lcm_result}$",
         variables: { num1: { min: 10, max: 90, default: 30 }, num2: { min: 20, max: 90, default: 50 } }
       },
       m2: {
-        stem: "Find the LCM of $\\frac{${frac1_num}}{${frac1_den}}$, $\\frac{${frac2_num}}{${frac2_den}}$, $\\frac{${frac3_num}}{${frac3_den}}$ (use simplified forms).",
-        hint: "LCM of fractions: $\\dfrac{\\text{LCM of numerators}}{\\text{GCD of denominators}}$ (use simplified fractions).",
+        stem: "Find the LCM of $\\frac{${frac1_num}}{${frac1_den}}$, $\\frac{${frac2_num}}{${frac2_den}}$, $\\frac{${frac3_num}}{${frac3_den}}$ (simplify your answer).",
+        hint: "LCM of fractions: $\\frac{\\text{LCM of numerators}}{\\text{GCD of denominators}}$. Simplify each fraction first.",
         answer: "${fraction_lcm_s}",
-        explanation: "First simplify each fraction. For numerators: ${simplified_nums_list}. For denominators: ${simplified_dens_list}. Now LCM(num): ${numerator_lcm_s}, GCD(den): ${denominator_gcd_s}. LCM = $\\dfrac{${numerator_lcm_s}}{${denominator_gcd_s}} = ${fraction_lcm_s}$.",
+        explanation: "Step 1:\n$$\\text{Simplify: } ${simplified_nums_list} \\text{ over } ${simplified_dens_list}$$\n\nStep 2:\n$$\\text{LCM(numerators)} = ${numerator_lcm_s}$$\n\nStep 3:\n$$\\text{GCD(denominators)} = ${denominator_gcd_s}$$\n\nStep 4:\n$$\\text{LCM} = \\frac{${numerator_lcm_s}}{${denominator_gcd_s}} = ${fraction_lcm_s}$$\n\nFinal Answer: $${fraction_lcm_s}$",
         variables: { frac1_num: { min: 2, max: 15, default: 7 }, frac1_den: { min: 2, max: 15, default: 9 }, frac2_num: { min: 2, max: 70, default: 63 }, frac2_den: { min: 2, max: 15, default: 8 }, frac3_num: { min: 2, max: 15, default: 9 }, frac3_den: { min: 2, max: 15, default: 7 } }
       },
       m3: {
         stem: "Two numbers are in the ratio $${ratio1}:${ratio2}$ with HCF $${hcf}$. Find their LCM.",
-        hint: "Numbers: $${ratio1} \\times ${hcf}$ and $${ratio2} \\times ${hcf}$; LCM$=\\dfrac{numbers\*product}{hcf}$.",
+        hint: "The numbers are $${ratio1} \\times ${hcf}$ and $${ratio2} \\times ${hcf}$. Use the formula: LCM = $\\frac{a \\times b}{\\text{HCF}}$",
         answer: "${ratio_lcm}",
-        explanation: "numbers: $${ratio1}$ , $${ratio2}$. LCM$={${ratio1} \\times ${ratio2} \\times ${hcf}}=${ratio_lcm}$.",
+        explanation: "Step 1:\n$$\\text{Numbers are: } ${ratio1} \\times ${hcf} = ${num1_calc} \\text{ and } ${ratio2} \\times ${hcf} = ${num2_calc}$$\n\nStep 2:\n$$\\text{LCM} = \\frac{${num1_calc} \\times ${num2_calc}}{${hcf}}$$\n\nStep 3:\n$$\\text{LCM} = \\frac{${product_calc}}{${hcf}} = ${ratio_lcm}$$\n\nFinal Answer: $${ratio_lcm}$",
         variables: { ratio1: { min: 2, max: 8, default: 2 }, ratio2: { min: 2, max: 12, default: 3 }, hcf: { min: 2, max: 20, default: 9 } }
       },
       m4: {
         stem: "Find greatest length exactly measuring $${length1}$m, $${length2}$m, $${length3}$m.",
-        hint: "Find GCD($${length1}, ${length2}, ${length3}$).",
+        hint: "Find the GCD (Greatest Common Divisor) of all three numbers.",
         answer: "${lengths_gcd}",
-        explanation: "$${length1}, ${length2}, ${length3}$. GCD=${lengths_gcd}.",
+        explanation: "Step 1:\n$$\\text{Find GCD of } ${length1}, ${length2}, ${length3}$$\n\nStep 2:\n$$\\text{Prime factorize each number}$$\n\nStep 3:\n$$\\text{Take common factors with lowest powers}$$\n\nStep 4:\n$$\\text{GCD} = ${lengths_gcd}$$\n\nFinal Answer: $${lengths_gcd}$ m",
         variables: { length1: { min: 10, max: 30, default: 14 }, length2: { min: 15, max: 35, default: 21 }, length3: { min: 20, max: 65, default: 35 } }
       }
     },
     "percentages": {
       m1: {
         stem: "If $${percent1}\\%$ of $A$ equals $${percent2}\\%$ of $B$, what percent of $A$ is $B$?",
-        hint: "Set up: $\\frac{${percent1}}{100}A=\\frac{${percent2}}{100}B$. Solve $B$ in terms of $A$.",
+        hint: "Set up the equation: $\\frac{${percent1}}{100}A = \\frac{${percent2}}{100}B$ and solve for $B$ in terms of $A$.",
         answer: "${percent_of_A}%",
-        explanation: "Given $\\frac{${percent1}}{100}A=\\frac{${percent2}}{100}B$, $B=${percent_of_A}\\%$ of $A$.",
+        explanation: "Step 1:\n$$\\frac{${percent1}}{100}A = \\frac{${percent2}}{100}B$$\n\nStep 2:\n$$B = \\frac{${percent1}}{${percent2}} \\times A$$\n\nStep 3:\n$$B = \\frac{${percent1} \\times 100}{${percent2}} \\% \\text{ of } A$$\n\nStep 4:\n$$B = ${percent_of_A}\\% \\text{ of } A$$\n\nFinal Answer: $${percent_of_A}\\%$",
         variables: { percent1: { min: 10, max: 99, default: 80 }, percent2: { min: 10, max: 99, default: 50 } }
       },
       m2: {
         stem: "$\\dfrac{${numerator1}}{${denominator1}}$ is what percent of $\\dfrac{${numerator2}}{${denominator2}}$?",
-        hint: "Percent=$\\dfrac{\\dfrac{${numerator1}}{${denominator1}}}{\\dfrac{${numerator2}}{${denominator2}}}\\times100$.",
+        hint: "Divide the first fraction by the second, then multiply by 100.",
         answer: "${fraction_percent}%",
-        explanation: "$\\dfrac{${numerator1}}{${denominator1}} \\div \\dfrac{${numerator2}}{${denominator2}} \\times100=${fraction_percent}\\%$.",
+        explanation: "Step 1:\n$$\\text{Percent} = \\frac{\\frac{${numerator1}}{${denominator1}}}{\\frac{${numerator2}}{${denominator2}}} \\times 100$$\n\nStep 2:\n$$= \\frac{${numerator1}}{${denominator1}} \\times \\frac{${denominator2}}{${numerator2}} \\times 100$$\n\nStep 3:\n$$= \\frac{${numerator1} \\times ${denominator2}}{${denominator1} \\times ${numerator2}} \\times 100$$\n\nStep 4:\n$$= ${fraction_percent}\\%$$\n\nFinal Answer: $${fraction_percent}\\%$",
         variables: { numerator1: { min: 1, max: 9, default: 3 }, denominator1: { min: 2, max: 12, default: 4 }, numerator2: { min: 1, max: 7, default: 1 }, denominator2: { min: 2, max: 12, default: 2 } }
       },
       m3: {
         stem: "Staff decreased from $${original}$ to $${current}$. What is the percent decrease?",
-        hint: "Percent decrease = $\\frac{\\text{Original} - \\text{Current}}{\\text{Original}} \\times 100$.",
+        hint: "Use the formula: Percent decrease = $\\frac{\\text{Original} - \\text{Current}}{\\text{Original}} \\times 100$",
         answer: "${percent_decrease}%",
-        explanation: "Percent decrease=$\\frac{${original}-${current}}{${original}}\\times100=${percent_decrease}$.",
+        explanation: "Step 1:\n$$\\text{Decrease} = ${original} - ${current} = ${decrease_value}$$\n\nStep 2:\n$$\\text{Percent decrease} = \\frac{${decrease_value}}{${original}} \\times 100$$\n\nStep 3:\n$$= ${percent_decrease}\\%$$\n\nFinal Answer: $${percent_decrease}\\%$",
         variables: { original: { min: 10, max: 120, default: 40 }, current: { min: 2, max: 120, default: 29 } }
       },
       m4: {
         stem: "Calculate $${percent1}\\%$ of $${percent2}\\%$ of $${number}$.",
-        hint: "Multiply: \\( \\frac{${percent1}}{100} \\times \\frac{${percent2}}{100} \\times ${number} \\) for the result.",
+        hint: "Multiply the fractions: $\\frac{${percent1}}{100} \\times \\frac{${percent2}}{100} \\times ${number}$",
         answer: "${chain_percent}",
-        explanation: "Step-by-step: \\( ${percent1}\\% \\text{ of } ${percent2}\\% \\text{ of } ${number} = \\frac{${percent1}}{100} \\times \\frac{${percent2}}{100} \\times ${number} = ${chain_result} \\). So, final answer: ${chain_percent}.",
+        explanation: "Step 1:\n$$${percent1}\\% \\text{ of } ${percent2}\\% \\text{ of } ${number}$$\n\nStep 2:\n$$= \\frac{${percent1}}{100} \\times \\frac{${percent2}}{100} \\times ${number}$$\n\nStep 3:\n$$= \\frac{${percent1} \\times ${percent2}}{10000} \\times ${number}$$\n\nStep 4:\n$$= ${chain_percent}$$\n\nFinal Answer: $${chain_percent}$",
         variables: { percent1: { min: 10, max: 90, default: 20 }, percent2: { min: 10, max: 90, default: 25 }, number: { min: 10, max: 999, default: 300 } }
       }
     }
@@ -374,8 +381,17 @@
 
     const handleSubmit = useCallback(async () => {
       const dynamicAnswer = calculateDynamicAnswer(model || "", variables);
-      const correct =
-        userAnswer.toLowerCase().trim() === dynamicAnswer.toLowerCase().trim();
+      
+      // Normalize answers for comparison
+      const normalizeAnswer = (ans: string) => {
+        return ans.toLowerCase().trim()
+          .replace(/\s+/g, ' ')  // normalize spaces
+          .replace(/\.0+(%?)$/, '$1')  // 22.0% -> 22%
+          .replace(/\/1$/, '')  // 63/1 -> 63
+          .replace(/\.0+$/, '');  // 22.0 -> 22
+      };
+      
+      const correct = normalizeAnswer(userAnswer) === normalizeAnswer(dynamicAnswer);
       setIsCorrect(correct);
       setIsTimerActive(false);
 
