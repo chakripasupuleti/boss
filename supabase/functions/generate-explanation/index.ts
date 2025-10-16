@@ -79,10 +79,10 @@ serve(async (req) => {
 
     const systemPrompt = `You are a math tutor. Generate step-by-step solutions in this EXACT format:
 
-**Step 1:** [Clear statement of first step]
+**Step 1:**
 $$[mathematical equation or calculation]$$
 
-**Step 2:** [Clear statement of second step]
+**Step 2:** 
 $$[mathematical equation or calculation]$$
 
 ...continue for all steps...
