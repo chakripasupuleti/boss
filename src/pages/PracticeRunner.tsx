@@ -333,6 +333,8 @@
     const [sessionStartTime, setSessionStartTime] = useState<number>(Date.now());
     const [questionStartTime, setQuestionStartTime] = useState<number>(Date.now());
     const [aiExplanation, setAiExplanation] = useState<string>("");
+    const [aiStreamText, setAiStreamText] = useState<string>("");
+    const [aiStreamDone, setAiStreamDone] = useState(false);
     const [isLoadingAI, setIsLoadingAI] = useState(false);
     const [explanationError, setExplanationError] = useState<string>("");
     const [isBaseQuestion, setIsBaseQuestion] = useState(true);
@@ -377,6 +379,30 @@
       },
       [topic]
     );
+
+    const sanitizeAiExplanation = (text: string): string => {
+      return text
+        // Remove markdown bold/italics
+        .replace(/\*\*/g, '')
+        .replace(/\*/g, '')
+        // Remove code fences but keep content
+        .replace(/```(?:\w+)?\n?([\s\S]*?)```/g, '$1')
+        // Normalize LaTeX delimiters (redundant but safe)
+        .replace(/\\\(/g, '$')
+        .replace(/\\\)/g, '$')
+        .replace(/\\\[/g, '$$')
+        .replace(/\\\]/g, '$$')
+        // Tighten spaces around inline math
+        .replace(/\$\s+/g, '$')
+        .replace(/\s+\$/g, '$')
+        // Convert standalone $...$ lines to $$...$$ blocks
+        .replace(/^\s*\$([^$\n]+)\$\s*$/gm, '$$$$1$$')
+        // Replace unicode minus with ASCII
+        .replace(/\u2212/g, '-')
+        // Trim excessive blank lines
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+    };
 
 
     const handleSubmit = useCallback(async () => {
@@ -433,6 +459,8 @@
           // Generate AI explanation for slider variants
           setIsLoadingAI(true);
           setAiExplanation("");
+          setAiStreamText("");
+          setAiStreamDone(false);
           setExplanationError("");
           setShowExplanation(true);
 
@@ -471,32 +499,70 @@
 
             const reader = response.body?.getReader();
             const decoder = new TextDecoder();
-            let explanation = "";
+            let textBuffer = "";
+            let fullText = "";
 
             if (reader) {
               while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
 
-                const chunk = decoder.decode(value);
-                const lines = chunk.split("\n");
+                textBuffer += decoder.decode(value, { stream: true });
 
-                for (const line of lines) {
-                  if (line.startsWith("data: ")) {
-                    const data = line.slice(6);
-                    if (data === "[DONE]") continue;
-                    try {
-                      const parsed = JSON.parse(data);
-                      const content = parsed.choices?.[0]?.delta?.content;
-                      if (content) {
-                        explanation += content;
-                        setAiExplanation(explanation);
-                      }
-                    } catch (e) {
-                      // Skip invalid JSON
+                // Process complete lines only
+                let newlineIndex: number;
+                while ((newlineIndex = textBuffer.indexOf("\n")) !== -1) {
+                  let line = textBuffer.slice(0, newlineIndex);
+                  textBuffer = textBuffer.slice(newlineIndex + 1);
+
+                  if (line.endsWith("\r")) line = line.slice(0, -1);
+                  if (line.startsWith(":") || line.trim() === "") continue;
+                  if (!line.startsWith("data: ")) continue;
+
+                  const jsonStr = line.slice(6).trim();
+                  if (jsonStr === "[DONE]") {
+                    // Sanitize and finalize
+                    const sanitized = sanitizeAiExplanation(fullText);
+                    setAiExplanation(sanitized);
+                    setAiStreamDone(true);
+                    break;
+                  }
+
+                  try {
+                    const parsed = JSON.parse(jsonStr);
+                    const content = parsed.choices?.[0]?.delta?.content;
+                    if (content) {
+                      fullText += content;
+                      // Show plain text preview (minimal sanitization for readability)
+                      setAiStreamText(fullText.replace(/\*\*/g, '').replace(/```/g, ''));
                     }
+                  } catch {
+                    // Incomplete JSON - put line back and wait for more data
+                    textBuffer = line + "\n" + textBuffer;
+                    break;
                   }
                 }
+              }
+
+              // Final flush for any remaining buffer
+              if (textBuffer.trim()) {
+                for (let raw of textBuffer.split("\n")) {
+                  if (!raw || raw.startsWith(":") || !raw.startsWith("data: ")) continue;
+                  const jsonStr = raw.slice(6).trim();
+                  if (jsonStr === "[DONE]") continue;
+                  try {
+                    const parsed = JSON.parse(jsonStr);
+                    const content = parsed.choices?.[0]?.delta?.content;
+                    if (content) fullText += content;
+                  } catch { /* ignore incomplete JSON */ }
+                }
+              }
+
+              // Final sanitization
+              if (fullText && !aiStreamDone) {
+                const sanitized = sanitizeAiExplanation(fullText);
+                setAiExplanation(sanitized);
+                setAiStreamDone(true);
               }
             }
           } catch (error) {
@@ -827,7 +893,7 @@
                 </CardHeader>
                 <CardContent>
                   {showHint ? (
-                    <div className="p-3 rounded-lg bg-highlight/10 border border-highlight/20">
+                    <div className="p-3 rounded-lg bg-highlight/10 border border-highlight/20 max-h-52 overflow-y-auto">
                       <MathRenderer className="text-sm">
                         {interpolateTemplate(question.hint, variables)}
                       </MathRenderer>
@@ -869,21 +935,24 @@
                 <CardContent>
                   {showExplanation ? (
                     <div className="space-y-3">
-                      {isLoadingAI && !aiExplanation && (
-                        <div className="p-3 rounded-lg bg-accent/10 border border-accent/20">
-                          <div className="flex items-center gap-2 text-accent">
-                            <Sparkles className="h-4 w-4 animate-pulse" />
-                            <span className="text-sm">Generating AI explanation...</span>
+                      {isLoadingAI && !aiStreamDone ? (
+                        <div className="space-y-3">
+                          <div className="p-3 rounded-lg bg-accent/10 border border-accent/20">
+                            <div className="flex items-center gap-2 text-accent">
+                              <Sparkles className="h-4 w-4 animate-pulse" />
+                              <span className="text-sm">Generating AI explanation...</span>
+                            </div>
                           </div>
+                          {aiStreamText && (
+                            <div className="p-3 rounded-md bg-muted/30 text-sm max-h-80 overflow-y-auto">
+                              <pre className="whitespace-pre-wrap font-sans text-foreground/70">
+                                {aiStreamText}
+                              </pre>
+                            </div>
+                          )}
                         </div>
-                      )}
-                      {explanationError && (
-                        <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
-                          <p className="text-sm text-destructive">{explanationError}</p>
-                        </div>
-                      )}
-                      {aiExplanation && (
-                        <div className="p-3 rounded-lg bg-accent/10 border border-accent/20">
+                      ) : aiExplanation ? (
+                        <div className="p-3 rounded-lg bg-accent/10 border border-accent/20 max-h-80 overflow-y-auto">
                           <div className="flex items-center gap-2 mb-2 text-accent">
                             <Sparkles className="h-4 w-4" />
                             <span className="text-xs font-semibold">AI Explanation</span>
@@ -892,7 +961,11 @@
                             {aiExplanation}
                           </MathRenderer>
                         </div>
-                      )}
+                      ) : explanationError ? (
+                        <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+                          <p className="text-sm text-destructive">{explanationError}</p>
+                        </div>
+                      ) : null}
                     </div>
                   ) : (
                     <div className="text-center py-6 text-muted-foreground">

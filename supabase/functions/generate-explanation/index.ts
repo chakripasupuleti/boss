@@ -90,15 +90,18 @@ $$[mathematical equation or calculation]$$
 Final Answer: $[answer]$
 
 CRITICAL RULES:
-- NEVER use ** for bold formatting - use plain text only
-- Use $$ for ALL mathematical expressions (block equations)
-- Use $ only for inline variables in text
-- Number each step clearly (Step 1, Step 2, etc.) without any asterisks
+- NEVER use markdown: no ** (bold), no * (italics), no \`\`\` (code fences)
+- Use plain text only for step labels: "Step 1:", "Step 2:", "Final Answer:"
+- Use $$ for ALL block mathematical expressions (each on its own line)
+- Use $ only for inline variables within text
+- Do NOT put $$ on the same line as "Step X:" - always put math on the next line
+- Number each step clearly without any asterisks or formatting
 - Show ONE calculation per step
-- No paragraphs - only step statements and math
-- Always end with "Final Answer: $[value]$" (no asterisks)
+- No paragraphs - only step statements and math blocks
+- Always end with "Final Answer: $[value]$"
 - Keep explanations focused and scannable
-- Ensure all LaTeX is properly formatted with correct delimiters`;
+- All LaTeX must use proper delimiters: $$ for blocks, $ for inline
+- Never mix delimiters: do not use \\( \\) or \\[ \\]`;
 
     const userPrompt = `Question: ${questionText}
 

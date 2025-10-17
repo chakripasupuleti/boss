@@ -19,17 +19,26 @@ export function MathRenderer({ children, className }: MathRendererProps) {
 
   // Preprocess: Fix common AI formatting issues
   text = text
+    // Remove any leftover markdown
+    .replace(/\*\*/g, '')
+    .replace(/```[\s\S]*?```/g, '')
     // Replace \( \) with $ $
     .replace(/\\\(/g, '$')
     .replace(/\\\)/g, '$')
     // Replace \[ \] with $$ $$
     .replace(/\\\[/g, '$$')
-    .replace(/\\\]/g, '$$');
+    .replace(/\\\]/g, '$$')
+    // Collapse spaces around delimiters
+    .replace(/\$\s+/g, '$')
+    .replace(/\s+\$/g, '$')
+    // Convert standalone $...$ lines to $$...$$
+    .replace(/^\s*\$([^$\n]+)\$\s*$/gm, '$$$$1$$');
 
   // Order matters: $$...$$ | \[...\] | \(...\) | $...$
   // Non-greedy ([\s\S]+?) so we don't over-capture; supports newlines.
+  // Allow spaces inside inline math by using [^$\n]+? instead of requiring non-space after $
   const pattern =
-    /(\$\$([\s\S]+?)\$\$)|\\\[([\s\S]+?)\\\]|\\\(([\s\S]+?)\\\)|\$(?!\s)([^$]+?)\$/g;
+    /(\$\$([\s\S]+?)\$\$)|\\\[([\s\S]+?)\\\]|\\\(([\s\S]+?)\\\)|\$([^$\n]+?)\$/g;
 
   const parts: React.ReactNode[] = [];
   let lastIndex = 0;
