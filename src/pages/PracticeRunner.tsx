@@ -110,13 +110,12 @@
     let alternating_sum = 0;
     let sign = 1; // Start with + from rightmost
     
-    for (let i = all_digits.length - 1; i >= 0; i--) {
-      if (all_digits[i] === 'x') {
-        continue;
-      }
-      alternating_sum += sign * (all_digits[i] as number);
-      sign *= -1;
-    }
+        for (let i = all_digits.length - 1; i >= 0; i--) {
+          if (all_digits[i] !== 'x') {
+            alternating_sum += sign * (all_digits[i] as number);
+          }
+          sign *= -1; // Always flip sign for every position
+        }
     
     // Determine sign for x based on its position
     const x_position = before_digits.length;
