@@ -96,9 +96,36 @@
     const base_power_result = Math.pow(base, remainder_exp);
 
 
-    // Numbers M4
-    const div_rule_sum = vars.div_rule_sum ?? 4;
-    const correct_div11_x = ((div_rule_sum % 11) + 11) % 11;
+    // Numbers M4 - Dynamic divisibility by 11
+    const before_x = vars.before_x ?? 2579;
+    const after_x = vars.after_x ?? 25963;
+    
+    // Convert to digit arrays
+    const before_digits = String(before_x).split('').map(Number);
+    const after_digits = String(after_x).split('').map(Number);
+    
+    // Calculate alternating sum (right to left, starting with +)
+    // Pattern for "abcdxefghi": i - h + g - f + e - x + d - c + b - a
+    const all_digits = [...before_digits, 'x', ...after_digits];
+    let alternating_sum = 0;
+    let sign = 1; // Start with + from rightmost
+    
+    for (let i = all_digits.length - 1; i >= 0; i--) {
+      if (all_digits[i] === 'x') {
+        continue;
+      }
+      alternating_sum += sign * (all_digits[i] as number);
+      sign *= -1;
+    }
+    
+    // Determine sign for x based on its position
+    const x_position = before_digits.length;
+    const x_sign = (all_digits.length - 1 - x_position) % 2 === 0 ? 1 : -1;
+    
+    // For divisibility by 11: (alternating_sum + x_sign * x) ≡ 0 (mod 11)
+    // So: x ≡ -alternating_sum / x_sign (mod 11)
+    const x_contribution_needed = -alternating_sum * x_sign;
+    const correct_div11_x = ((x_contribution_needed % 11) + 11) % 11;
 
 
     // LCM HCF M1
@@ -178,7 +205,7 @@
       whole, recurring, difference, simplified_numerator: simplified_num, simplified_denominator: simplified_den,
       simplified_fraction: `${simplified_num}/${simplified_den}`,
       base, exponent, modulus, modulus_minus_1, quotient, remainder_exp, base_power_result, remainder_answer,
-      div_rule_sum, correct_div11_x,
+      before_x, after_x, correct_div11_x,
       num1, num2, num1_factors, num2_factors, hcf_result, lcm_result,
       frac1_num: nums[0], frac2_num: nums[1], frac3_num: nums[2],
       frac1_den: dens[0], frac2_den: dens[1], frac3_den: dens[2],
@@ -240,11 +267,14 @@
 },
 
       m4: {
-        stem: "Find the smallest value of $x$ such that $2579x25963$ is divisible by $11$.",
+        stem: "Find the smallest value of $x$ such that $${before_x}x${after_x}$ is divisible by $11$.",
         hint: "For divisibility by 11, the alternating sum of digits must be divisible by 11 or equal to 0.",
         answer: "${correct_div11_x}",
-        explanation: "Step 1:\n$$\\text{Alternating sum: } 2-5+7-9+x-2+5-9+6-3$$\n\nStep 2:\n$$= x - 8$$\n\nStep 3:\n$$\\text{For divisibility by 11: } (x-8) \\equiv 0 \\pmod{11}$$\n\nStep 4:\n$$x \\equiv 8 \\pmod{11}$$\n\nStep 5:\n$$\\text{Smallest single digit: } x = 8$$\n\nFinal Answer: $8$",
-        variables: { div_rule_sum: { min: 8, max: 8, default: 8 } }
+        explanation: "Step 1:\n$$\\text{Number: } ${before_x}x${after_x}$$\n\nStep 2:\n$$\\text{Apply divisibility rule for 11 (alternating sum of digits)}$$\n\nStep 3:\n$$\\text{For divisibility by 11, alternating sum} \\equiv 0 \\pmod{11}$$\n\nStep 4:\n$$\\text{Solving for } x \\text{ yields: } x = ${correct_div11_x}$$\n\nFinal Answer: $${correct_div11_x}$",
+        variables: { 
+          before_x: { min: 1000, max: 9999, default: 2579 },
+          after_x: { min: 10000, max: 99999, default: 25963 }
+        }
       }
     },
     "lcm-hcf": {
