@@ -358,7 +358,9 @@
     const [attempts, setAttempts] = useState(1);
     const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
     const [isDynamic, setIsDynamic] = useState(false);
-    const [variables, setVariables] = useState<Record<string, number>>({});
+  const [variables, setVariables] = useState<Record<string, number>>({});
+  const [inputValues, setInputValues] = useState<Record<string, string>>({});
+  const [inputErrors, setInputErrors] = useState<Record<string, string>>({});
     const [sessionId, setSessionId] = useState<string | null>(null);
     const [sessionStartTime, setSessionStartTime] = useState<number>(Date.now());
     const [questionStartTime, setQuestionStartTime] = useState<number>(Date.now());
@@ -893,31 +895,54 @@
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {Object.entries(question.variables).map(
+                     {Object.entries(question.variables).map(
                       ([key, config]) => (
                         <div key={key} className="space-y-2">
                           <div className="flex items-center justify-between">
                             <Label className="capitalize">
                               {key.replace("_", " ")}
                             </Label>
-                            <Input
-                              type="number"
-                              value={variables[key]}
-                              onChange={(e) => {
-                                const val = parseInt(e.target.value) || config.default;
-                                const bounded = Math.max(config.min, Math.min(config.max, val));
-                                handleVariableChange(key, bounded);
-                              }}
-                              min={config.min}
-                              max={config.max}
-                              className="w-24 text-right"
-                            />
+                            <div className="flex flex-col items-end gap-1">
+                              <Input
+                                type="number"
+                                value={inputValues[key] ?? variables[key]}
+                                onChange={(e) => {
+                                  setInputValues({ ...inputValues, [key]: e.target.value });
+                                  setInputErrors({ ...inputErrors, [key]: "" });
+                                }}
+                                onBlur={(e) => {
+                                  const val = parseInt(e.target.value);
+                                  if (isNaN(val)) {
+                                    setInputErrors({ ...inputErrors, [key]: "Please enter a valid number" });
+                                    setInputValues({ ...inputValues, [key]: String(variables[key]) });
+                                  } else if (val < config.min || val > config.max) {
+                                    setInputErrors({ 
+                                      ...inputErrors, 
+                                      [key]: `Value must be between ${config.min} and ${config.max}` 
+                                    });
+                                    setInputValues({ ...inputValues, [key]: String(variables[key]) });
+                                  } else {
+                                    handleVariableChange(key, val);
+                                    setInputValues({ ...inputValues, [key]: String(val) });
+                                    setInputErrors({ ...inputErrors, [key]: "" });
+                                  }
+                                }}
+                                min={config.min}
+                                max={config.max}
+                                className={`w-24 text-right ${inputErrors[key] ? 'border-destructive' : ''}`}
+                              />
+                              {inputErrors[key] && (
+                                <span className="text-xs text-destructive">{inputErrors[key]}</span>
+                              )}
+                            </div>
                           </div>
                           <Slider
                             value={[variables[key] || config.default]}
-                            onValueChange={([value]) =>
-                              handleVariableChange(key, value)
-                            }
+                            onValueChange={([value]) => {
+                              handleVariableChange(key, value);
+                              setInputValues({ ...inputValues, [key]: String(value) });
+                              setInputErrors({ ...inputErrors, [key]: "" });
+                            }}
                             min={config.min}
                             max={config.max}
                             step={1}
