@@ -404,6 +404,132 @@
         .trim();
     };
 
+    const generateExplanation = useCallback(async () => {
+      const dynamicAnswer = calculateDynamicAnswer(model || "", variables);
+      
+      // Use existing explanation for base question, generate AI for variants
+      if (isBaseQuestion && question.explanation) {
+        // Use pre-written explanation for base question
+        setAiExplanation(interpolateTemplate(question.explanation, variables));
+        setShowExplanation(true);
+      } else {
+        // Generate AI explanation for slider variants
+        setIsLoadingAI(true);
+        setAiExplanation("");
+        setAiStreamText("");
+        setAiStreamDone(false);
+        setExplanationError("");
+        setShowExplanation(true);
+
+        try {
+          const response = await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-explanation`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+              },
+              body: JSON.stringify({
+                questionText: interpolateTemplate(question?.stem || "", variables),
+                userAnswer: userAnswer || "No answer provided",
+                correctAnswer: dynamicAnswer,
+                topic: topic || "",
+                model: model || "",
+                variables,
+                baseExplanation: question.explanation,
+              }),
+            }
+          );
+
+          if (!response.ok) {
+            if (response.status === 429) {
+              setExplanationError("Rate limit exceeded. Please try again later.");
+              return;
+            }
+            if (response.status === 402) {
+              setExplanationError("AI usage limit reached. Please add credits to continue.");
+              return;
+            }
+            throw new Error("Failed to generate explanation");
+          }
+
+          const reader = response.body?.getReader();
+          const decoder = new TextDecoder();
+          let textBuffer = "";
+          let fullText = "";
+
+          if (reader) {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+
+              textBuffer += decoder.decode(value, { stream: true });
+
+              // Process complete lines only
+              let newlineIndex: number;
+              while ((newlineIndex = textBuffer.indexOf("\n")) !== -1) {
+                let line = textBuffer.slice(0, newlineIndex);
+                textBuffer = textBuffer.slice(newlineIndex + 1);
+
+                if (line.endsWith("\r")) line = line.slice(0, -1);
+                if (line.startsWith(":") || line.trim() === "") continue;
+                if (!line.startsWith("data: ")) continue;
+
+                const jsonStr = line.slice(6).trim();
+                if (jsonStr === "[DONE]") {
+                  // Sanitize and finalize
+                  const sanitized = sanitizeAiExplanation(fullText);
+                  setAiExplanation(sanitized);
+                  setAiStreamDone(true);
+                  break;
+                }
+
+                try {
+                  const parsed = JSON.parse(jsonStr);
+                  const content = parsed.choices?.[0]?.delta?.content;
+                  if (content) {
+                    fullText += content;
+                    // Show plain text preview (minimal sanitization for readability)
+                    setAiStreamText(fullText.replace(/\*\*/g, '').replace(/```/g, ''));
+                  }
+                } catch {
+                  // Incomplete JSON - put line back and wait for more data
+                  textBuffer = line + "\n" + textBuffer;
+                  break;
+                }
+              }
+            }
+
+            // Final flush for any remaining buffer
+            if (textBuffer.trim()) {
+              for (let raw of textBuffer.split("\n")) {
+                if (!raw || raw.startsWith(":") || !raw.startsWith("data: ")) continue;
+                const jsonStr = raw.slice(6).trim();
+                if (jsonStr === "[DONE]") continue;
+                try {
+                  const parsed = JSON.parse(jsonStr);
+                  const content = parsed.choices?.[0]?.delta?.content;
+                  if (content) fullText += content;
+                } catch { /* ignore incomplete JSON */ }
+              }
+            }
+
+            // Final sanitization
+            if (fullText && !aiStreamDone) {
+              const sanitized = sanitizeAiExplanation(fullText);
+              setAiExplanation(sanitized);
+              setAiStreamDone(true);
+            }
+          }
+        } catch (error) {
+          console.error("Error generating AI explanation:", error);
+          setExplanationError("Failed to generate explanation. Please refresh to try again.");
+        } finally {
+          setIsLoadingAI(false);
+        }
+      }
+    }, [question, variables, isBaseQuestion, model, topic, userAnswer, aiStreamDone]);
 
     const handleSubmit = useCallback(async () => {
       const dynamicAnswer = calculateDynamicAnswer(model || "", variables);
@@ -450,128 +576,8 @@
           await updateProgress({ accuracy: correct ? 100 : 0 });
         }
 
-        // Use existing explanation for base question, generate AI for variants
-        if (isBaseQuestion && question.explanation) {
-          // Use pre-written explanation for base question
-          setAiExplanation(interpolateTemplate(question.explanation, variables));
-          setShowExplanation(true);
-        } else {
-          // Generate AI explanation for slider variants
-          setIsLoadingAI(true);
-          setAiExplanation("");
-          setAiStreamText("");
-          setAiStreamDone(false);
-          setExplanationError("");
-          setShowExplanation(true);
-
-          try {
-            const response = await fetch(
-              `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-explanation`,
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-                },
-                body: JSON.stringify({
-                  questionText: interpolateTemplate(question?.stem || "", variables),
-                  userAnswer,
-                  correctAnswer: dynamicAnswer,
-                  topic: topic || "",
-                  model: model || "",
-                  variables,
-                  baseExplanation: question.explanation,
-                }),
-              }
-            );
-
-            if (!response.ok) {
-              if (response.status === 429) {
-                setExplanationError("Rate limit exceeded. Please try again later.");
-                return;
-              }
-              if (response.status === 402) {
-                setExplanationError("AI usage limit reached. Please add credits to continue.");
-                return;
-              }
-              throw new Error("Failed to generate explanation");
-            }
-
-            const reader = response.body?.getReader();
-            const decoder = new TextDecoder();
-            let textBuffer = "";
-            let fullText = "";
-
-            if (reader) {
-              while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-
-                textBuffer += decoder.decode(value, { stream: true });
-
-                // Process complete lines only
-                let newlineIndex: number;
-                while ((newlineIndex = textBuffer.indexOf("\n")) !== -1) {
-                  let line = textBuffer.slice(0, newlineIndex);
-                  textBuffer = textBuffer.slice(newlineIndex + 1);
-
-                  if (line.endsWith("\r")) line = line.slice(0, -1);
-                  if (line.startsWith(":") || line.trim() === "") continue;
-                  if (!line.startsWith("data: ")) continue;
-
-                  const jsonStr = line.slice(6).trim();
-                  if (jsonStr === "[DONE]") {
-                    // Sanitize and finalize
-                    const sanitized = sanitizeAiExplanation(fullText);
-                    setAiExplanation(sanitized);
-                    setAiStreamDone(true);
-                    break;
-                  }
-
-                  try {
-                    const parsed = JSON.parse(jsonStr);
-                    const content = parsed.choices?.[0]?.delta?.content;
-                    if (content) {
-                      fullText += content;
-                      // Show plain text preview (minimal sanitization for readability)
-                      setAiStreamText(fullText.replace(/\*\*/g, '').replace(/```/g, ''));
-                    }
-                  } catch {
-                    // Incomplete JSON - put line back and wait for more data
-                    textBuffer = line + "\n" + textBuffer;
-                    break;
-                  }
-                }
-              }
-
-              // Final flush for any remaining buffer
-              if (textBuffer.trim()) {
-                for (let raw of textBuffer.split("\n")) {
-                  if (!raw || raw.startsWith(":") || !raw.startsWith("data: ")) continue;
-                  const jsonStr = raw.slice(6).trim();
-                  if (jsonStr === "[DONE]") continue;
-                  try {
-                    const parsed = JSON.parse(jsonStr);
-                    const content = parsed.choices?.[0]?.delta?.content;
-                    if (content) fullText += content;
-                  } catch { /* ignore incomplete JSON */ }
-                }
-              }
-
-              // Final sanitization
-              if (fullText && !aiStreamDone) {
-                const sanitized = sanitizeAiExplanation(fullText);
-                setAiExplanation(sanitized);
-                setAiStreamDone(true);
-              }
-            }
-          } catch (error) {
-            console.error("Error generating AI explanation:", error);
-            setExplanationError("Failed to generate explanation. Please refresh to try again.");
-          } finally {
-            setIsLoadingAI(false);
-          }
-        }
+        // Generate explanation
+        await generateExplanation();
       } catch (error) {
         console.error("Failed to save attempt:", error);
       }
@@ -597,16 +603,16 @@
               setShowHint(true);
             }
             if (prev === 1) {
-              setTimeout(() => {
+              setTimeout(async () => {
                 if (userAnswer.trim()) {
                   // User entered an answer - evaluate it
                   handleSubmit();
                 } else {
-                  // User didn't attempt - mark as timed out
+                  // User didn't attempt - mark as timed out and generate explanation
                   setIsCorrect(false);
                   setIsTimerActive(false);
+                  await generateExplanation();
                 }
-                setShowExplanation(true);
               }, 1000);
             }
             return prev - 1;

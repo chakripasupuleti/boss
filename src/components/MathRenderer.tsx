@@ -52,8 +52,13 @@ export function MathRenderer({ children, className }: MathRendererProps) {
       const plainText = text.slice(lastIndex, matchStart);
       parts.push(plainText);
       
-      // Add spacing after plain text before math (if plain text doesn't end with space)
-      if (plainText.length > 0 && !plainText.endsWith(' ') && !plainText.endsWith('\n')) {
+      // Smart space before math
+      const charBefore = plainText.slice(-1);
+      const needsSpaceBefore =
+        plainText.length > 0 &&
+        !/\s/.test(charBefore) &&
+        !/[([{"']/.test(charBefore);
+      if (needsSpaceBefore) {
         parts.push(' ');
       }
     }
@@ -70,16 +75,21 @@ export function MathRenderer({ children, className }: MathRendererProps) {
 
     parts.push(
       isBlock ? (
-        <BlockMath key={matchStart} math={mathContent} />
+        <BlockMath key={matchStart} math={mathContent.trim()} />
       ) : (
-        <InlineMath key={matchStart} math={mathContent} />
+        <InlineMath key={matchStart} math={mathContent.trim()} />
       )
     );
 
     lastIndex = pattern.lastIndex;
     
-    // Add spacing after math element before next plain text
-    if (lastIndex < text.length && text[lastIndex] !== ' ' && text[lastIndex] !== '\n') {
+    // Smart space after math
+    const nextChar = text[lastIndex];
+    const needsSpaceAfter =
+      lastIndex < text.length &&
+      !/\s/.test(nextChar) &&
+      !/[.,;:!?)\]}\u201d\u2019]/.test(nextChar);
+    if (needsSpaceAfter) {
       parts.push(' ');
     }
   }
