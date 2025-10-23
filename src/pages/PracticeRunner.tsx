@@ -598,7 +598,14 @@
             }
             if (prev === 1) {
               setTimeout(() => {
-                handleSubmit();
+                if (userAnswer.trim()) {
+                  // User entered an answer - evaluate it
+                  handleSubmit();
+                } else {
+                  // User didn't attempt - mark as timed out
+                  setIsCorrect(false);
+                  setIsTimerActive(false);
+                }
                 setShowExplanation(true);
               }, 1000);
             }
@@ -685,7 +692,6 @@
               <Badge variant="outline" className="uppercase">
                 {topic?.replace("-", " & ")} - {model}
               </Badge>
-              <Badge variant="secondary">Attempt #{attempts}</Badge>
             </div>
 
 
@@ -858,9 +864,18 @@
                             <Label className="capitalize">
                               {key.replace("_", " ")}
                             </Label>
-                            <span className="text-sm font-medium">
-                              {variables[key]}
-                            </span>
+                            <Input
+                              type="number"
+                              value={variables[key]}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value) || config.default;
+                                const bounded = Math.max(config.min, Math.min(config.max, val));
+                                handleVariableChange(key, bounded);
+                              }}
+                              min={config.min}
+                              max={config.max}
+                              className="w-24 text-right"
+                            />
                           </div>
                           <Slider
                             value={[variables[key] || config.default]}
@@ -872,6 +887,10 @@
                             step={1}
                             className="w-full"
                           />
+                          <div className="flex justify-between text-xs text-muted-foreground">
+                            <span>{config.min}</span>
+                            <span>{config.max}</span>
+                          </div>
                         </div>
                       )
                     )}
@@ -926,7 +945,6 @@
                       onClick={() =>
                         setShowExplanation(!showExplanation)
                       }
-                      disabled={isCorrect === null}
                     >
                       {showExplanation ? "Hide" : "Show"}
                     </Button>

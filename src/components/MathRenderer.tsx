@@ -49,7 +49,13 @@ export function MathRenderer({ children, className }: MathRendererProps) {
 
     // Push plain text before the match
     if (matchStart > lastIndex) {
-      parts.push(text.slice(lastIndex, matchStart));
+      const plainText = text.slice(lastIndex, matchStart);
+      parts.push(plainText);
+      
+      // Add spacing after plain text before math (if plain text doesn't end with space)
+      if (plainText.length > 0 && !plainText.endsWith(' ') && !plainText.endsWith('\n')) {
+        parts.push(' ');
+      }
     }
 
     // Determine if it's block or inline and extract inner math
@@ -71,6 +77,11 @@ export function MathRenderer({ children, className }: MathRendererProps) {
     );
 
     lastIndex = pattern.lastIndex;
+    
+    // Add spacing after math element before next plain text
+    if (lastIndex < text.length && text[lastIndex] !== ' ' && text[lastIndex] !== '\n') {
+      parts.push(' ');
+    }
   }
 
   // Push any trailing text
