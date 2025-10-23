@@ -249,10 +249,10 @@
     },
     "lcm-hcf": {
       m1: {
-        stem: "Find both the HCF and LCM of $${num1}$ and $${num2}$.Format:HCF: , LCM: ",
+        stem: "Find both the HCF and LCM of $${num1}$ and $${num2}$. Format:HCF,LCM,
         hint: "Use prime factorization: Take lowest powers for HCF, highest powers for LCM.",
-        answer: "HCF: ${hcf_result}, LCM: ${lcm_result}",
-        explanation: "Step 1:\n$$${num1} = ${num1_factors}$$\n\nStep 2:\n$$${num2} = ${num2_factors}$$\n\nStep 3:\n$$\\text{HCF (common factors, lowest powers)} = ${hcf_result}$$\n\nStep 4:\n$$\\text{LCM (all factors, highest powers)} = ${lcm_result}$$\n\nFinal Answer: HCF: $${hcf_result}$, LCM: $${lcm_result}$",
+        answer: "${hcf_result},${lcm_result}",
+        explanation: "Step 1:\n$$${num1} = ${num1_factors}$$\n\nStep 2:\n$$${num2} = ${num2_factors}$$\n\nStep 3:\n$$\\text{HCF (common factors, lowest powers)} = ${hcf_result}$$\n\nStep 4:\n$$\\text{LCM (all factors, highest powers)} = ${lcm_result}$$\n\nFinal Answer:$${hcf_result}$, $${lcm_result}$",
         variables: { num1: { min: 10, max: 90, default: 30 }, num2: { min: 20, max: 90, default: 50 } }
       },
       m2: {
