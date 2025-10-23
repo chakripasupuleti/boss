@@ -773,7 +773,6 @@ export default function PracticeRunner() {
             <Badge variant="outline" className="uppercase">
               {topic?.replace("-", " & ")} - {model}
             </Badge>
-            <Badge variant="secondary">Attempt #{attempts}</Badge>
           </div>
 
           <AlertDialog>
