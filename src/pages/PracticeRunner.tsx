@@ -147,8 +147,15 @@ const interpolateTemplate = (template: string, vars: Record<string, number>): st
   const ratio1 = vars.ratio1 || 2,
     ratio2 = vars.ratio2 || 3,
     r_hcf = vars.hcf || 9;
-  const num1_calc = ratio1 * r_hcf;
-  const num2_calc = ratio2 * r_hcf;
+  
+  // Simplify the ratio to lowest terms first
+  const ratio_gcd = gcd(ratio1, ratio2);
+  const simplified_ratio1 = ratio1 / ratio_gcd;
+  const simplified_ratio2 = ratio2 / ratio_gcd;
+  
+  // Calculate actual numbers using simplified ratio
+  const num1_calc = simplified_ratio1 * r_hcf;
+  const num2_calc = simplified_ratio2 * r_hcf;
   const product_calc = num1_calc * num2_calc;
   const ratio_lcm = product_calc / r_hcf;
 
@@ -161,23 +168,21 @@ const interpolateTemplate = (template: string, vars: Record<string, number>): st
   // Percentages M1 (percent relationship)
   const percent1 = vars.percent1 || 80,
     percent2 = vars.percent2 || 50;
-  const percent_of_A = ((percent1 / percent2) * 100).toFixed(0);
+  const percent_of_A = ((percent1 / percent2) * 100).toFixed(2);
 
   // Percentages M2 (fraction percent)
   const numerator1 = vars.numerator1 || 3,
     denominator1 = vars.denominator1 || 4;
   const numerator2 = vars.numerator2 || 1,
     denominator2 = vars.denominator2 || 2;
-  const fraction_percent = ((numerator1 / denominator1 / (numerator2 / denominator2)) * 100).toFixed(0);
+  const fraction_percent = ((numerator1 / denominator1 / (numerator2 / denominator2)) * 100).toFixed(2);
 
   // Percentages M3 (percent decrease)
   const original = vars.original || 40,
     current = vars.current || 29;
   const decrease_value = original - current;
   const percent_decrease_raw = (decrease_value / original) * 100;
-  const percent_decrease = Number.isInteger(percent_decrease_raw)
-    ? String(percent_decrease_raw)
-    : percent_decrease_raw.toFixed(1);
+  const percent_decrease = percent_decrease_raw.toFixed(2);
 
   // Percentages M4 (chain percent, also showing with number as unit)
   const chain_result = (((percent1 / 100) * percent2) / 100) * (vars.number || 300);
@@ -223,6 +228,9 @@ const interpolateTemplate = (template: string, vars: Record<string, number>): st
     ratio1,
     ratio2,
     hcf: r_hcf,
+    ratio_gcd,
+    simplified_ratio1,
+    simplified_ratio2,
     ratio_lcm,
     num1_calc,
     num2_calc,
@@ -335,7 +343,7 @@ const practiceQuestions: Record<string, Record<string, QuestionData>> = {
       hint: "The numbers are $${ratio1} \\times ${hcf}$ and $${ratio2} \\times ${hcf}$. Use the formula: LCM = $\\frac{a \\times b}{\\text{HCF}}$",
       answer: "${ratio_lcm}",
       explanation:
-        "Step 1:\n$$\\text{Numbers are: } ${ratio1} \\times ${hcf} = ${num1_calc} \\text{ and } ${ratio2} \\times ${hcf} = ${num2_calc}$$\n\nStep 2:\n$$\\text{LCM} = \\frac{${num1_calc} \\times ${num2_calc}}{${hcf}}$$\n\nStep 3:\n$$\\text{LCM} = \\frac{${product_calc}}{${hcf}} = ${ratio_lcm}$$\n\nFinal Answer: $${ratio_lcm}$",
+        "Step 1:\n$$\\text{Simplify ratio: } ${ratio1}:${ratio2} = ${simplified_ratio1}:${simplified_ratio2}$$\n\nStep 2:\n$$\\text{Numbers are: } ${simplified_ratio1} \\times ${hcf} = ${num1_calc} \\text{ and } ${simplified_ratio2} \\times ${hcf} = ${num2_calc}$$\n\nStep 3:\n$$\\text{LCM} = \\frac{${num1_calc} \\times ${num2_calc}}{${hcf}}$$\n\nStep 4:\n$$\\text{LCM} = \\frac{${product_calc}}{${hcf}} = ${ratio_lcm}$$\n\nFinal Answer: $${ratio_lcm}$",
       variables: {
         ratio1: { min: 2, max: 8, default: 2 },
         ratio2: { min: 2, max: 12, default: 3 },
